@@ -1,3 +1,13 @@
+/**
+ * @file tests.cpp
+ * @author Matúš Ďurica (xduric06@stud.fit.vutbr.cz)
+ * @brief Unit tests for the imapcl application
+ * @version 0.1
+ * @date 2024-10-08
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #include <cstdlib>
 #include <gtest/gtest.h>
 

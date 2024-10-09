@@ -1,24 +1,47 @@
+/**
+ * @file Utils.h
+ * @author Matúš Ďurica (xduric06@stud.fit.vutbr.cz)
+ * @brief Contains declarations of utilities
+ * @version 0.1
+ * @date 2024-10-08
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <cstdlib>
 #include <getopt.h>
 #include <iostream>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <string>
+#include <sys/socket.h>
+
+#define DEBUG
 
 namespace Utils
 {
 
 typedef enum ReturnCodes
 {
-    ARGS_MISSING_SERVER = 2,
+    IMAPCL_SUCCESS = 0,
+    IMAPCL_FAILURE,
+    ARGS_MISSING_SERVER,
     ARGS_MISSING_REQUIRED,
-    ARGS_UNKNOWN_ARGUMENT
+    ARGS_UNKNOWN_ARGUMENT,
+    SOCKET_CREATING,
+    SOCKET_CONNECTING,
+    SERVER_BAD_HOST,
+    AUTH_FILE_OPEN,
+    AUTH_INVALID_CREDENTIALS,
+    AUTH_MISSING_CREDENTIALS,
 } ReturnCodes;
 
 typedef struct Arguments
 {
     std::string ServerAddress;
-    int Port;
+    std::string Port;
     bool Encrypted;
     std::string CertificateFile;
     std::string CertificateFileDirectoryPath;
@@ -29,16 +52,16 @@ typedef struct Arguments
     std::string OutDirectoryPath;
 
     Arguments()
-        : Port(-1), Encrypted(false), CertificateFile(""), CertificateFileDirectoryPath(""), OnlyNewMails(false),
+        : Port(""), Encrypted(false), CertificateFile(""), CertificateFileDirectoryPath(""), OnlyNewMails(false),
           OnlyMailHeaders(false), AuthFilePath(""), MailBox("INBOX"), OutDirectoryPath("") {};
 } Arguments;
 
 inline void PrintError(ReturnCodes returnCode, std::string errorMessage)
 {
-    std::cerr << "[" << returnCode << "] " << "ERROR: " << errorMessage << "\n";
+    std::cerr << "\033[1m" << "[" << returnCode << "] " << "ERROR: " << "\033[0m" << errorMessage << "\n";
 }
 
-inline int CheckArguments(int argc, char **argv, Arguments &arguments)
+inline Utils::ReturnCodes CheckArguments(int argc, char **argv, Arguments &arguments)
 {
     int opt;
     bool helpFlag = false;
@@ -72,7 +95,7 @@ inline int CheckArguments(int argc, char **argv, Arguments &arguments)
             break;
         }
         case 'p':
-            arguments.Port = std::stoi(optarg);
+            arguments.Port = optarg;
             break;
         case 'T':
             arguments.Encrypted = true;
@@ -102,11 +125,11 @@ inline int CheckArguments(int argc, char **argv, Arguments &arguments)
             break;
         case '?':
             std::cerr << "DEEZ" << opt << "\n";
-            return ARGS_UNKNOWN_ARGUMENT;
+            return Utils::ARGS_UNKNOWN_ARGUMENT;
             break;
         default:
             std::cerr << "UNKNOWN ARGS!" << "\n";
-            return ARGS_UNKNOWN_ARGUMENT;
+            return Utils::ARGS_UNKNOWN_ARGUMENT;
             break;
         }
     }
@@ -114,7 +137,7 @@ inline int CheckArguments(int argc, char **argv, Arguments &arguments)
     // TODO: parsing of server address
     for (int i = optind; i < argc; i++)
     {
-        std::cerr << "ARG " << argv[i] << "\n";
+        arguments.ServerAddress = argv[i];
         serverAddressSet = true;
     }
 
@@ -122,27 +145,27 @@ inline int CheckArguments(int argc, char **argv, Arguments &arguments)
     {
         // print help
         std::cerr << "deez" << "\n";
-        return EXIT_SUCCESS;
+        return Utils::IMAPCL_SUCCESS;
     }
 
     if (!serverAddressSet)
     {
-        PrintError(ARGS_MISSING_SERVER, "MISSING SERVER ADDRESS");
-        return ARGS_MISSING_SERVER;
+        PrintError(Utils::ARGS_MISSING_SERVER, "Missing server address");
+        return Utils::ARGS_MISSING_SERVER;
     }
 
     if (!authFileSet)
     {
-        PrintError(ARGS_MISSING_REQUIRED, "MISSING REQUIRED ARG");
-        return ARGS_MISSING_REQUIRED;
+        PrintError(Utils::ARGS_MISSING_REQUIRED, "Missing required arguments");
+        return Utils::ARGS_MISSING_REQUIRED;
     }
 
     if (!outDirectorySet)
     {
-        PrintError(ARGS_MISSING_REQUIRED, "MISSING REQUIRED ARG");
-        return ARGS_MISSING_REQUIRED;
+        PrintError(Utils::ARGS_MISSING_REQUIRED, "Missing required arguments");
+        return Utils::ARGS_MISSING_REQUIRED;
     }
 
-    return EXIT_SUCCESS;
+    return Utils::IMAPCL_SUCCESS;
 }
 } // namespace Utils

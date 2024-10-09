@@ -1,7 +1,6 @@
 CXX				:= g++
 RM				:= rm -rf
 CXXFLAGS		:= -std=c++20 -Werror -Wall -Wpedantic
-TEST_FLAGS		:= -lgtest -lgtest_main -pthread
 TARGET			:= imapcl
 TESTS_TARGET 	:= tests
 BUILD			:= ./build
