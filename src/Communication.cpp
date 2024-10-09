@@ -124,6 +124,24 @@ Utils::ReturnCodes Communication::Authenticate(const std::string &authFilePath)
     return Utils::IMAPCL_SUCCESS;
 }
 
+Utils::ReturnCodes Communication::Logout()
+{
+    this->Buffer = "A1 logout\n";
+    send(this->SocketDescriptor, this->Buffer.c_str(), this->Buffer.length(), 0);
+    this->Buffer = std::string("", 1024);
+    while (true)
+    {
+        int received = recv(this->SocketDescriptor, this->Buffer.data(), this->Buffer.length(), 0);
+        if (received != 0)
+        {
+            std::cerr << "RECV: " << std::to_string(received) << "\n";
+            std::cout << this->Buffer.substr(0, received);
+            break;
+        }
+    }
+    return Utils::IMAPCL_SUCCESS;
+}
+
 int Communication::GetSocketDescriptor()
 {
     return this->SocketDescriptor;

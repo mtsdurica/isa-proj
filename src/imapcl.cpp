@@ -27,11 +27,13 @@ int main(int argc, char **argv)
     if (Utils::CheckArguments(argc, argv, arguments))
         return Utils::IMAPCL_FAILURE;
 #ifdef DEBUG
-    std::cerr << "---------------DEBUG---------------" << "\n";
+    std::cerr << "---------------DEBUG---------------"
+              << "\n";
     std::cerr << arguments.OutDirectoryPath << "\n";
     std::cerr << arguments.AuthFilePath << "\n";
     std::cerr << arguments.ServerAddress << "\n";
-    std::cerr << "-----------------------------------" << "\n";
+    std::cerr << "-----------------------------------"
+              << "\n";
 #endif
     Communication communication;
     if (communication.GetHostAddressInfo(arguments.ServerAddress, arguments.Port))
@@ -42,18 +44,7 @@ int main(int argc, char **argv)
         return Utils::SOCKET_CONNECTING;
     if (communication.Authenticate(arguments.AuthFilePath))
         return Utils::AUTH_FILE_OPEN;
-    buffer = "A1 logout\n";
-    send(communication.GetSocketDescriptor(), buffer.c_str(), buffer.length(), 0);
-    buffer = std::string("", 1024);
-    while (true)
-    {
-        int received = recv(communication.GetSocketDescriptor(), buffer.data(), buffer.length(), 0);
-        if (received != 0)
-        {
-            std::cerr << "RECV: " << std::to_string(received) << "\n";
-            std::cout << buffer.substr(0, received) << "\n";
-            break;
-        }
-    }
+    if (communication.Logout())
+        return Utils::AUTH_FILE_OPEN;
     return Utils::IMAPCL_SUCCESS;
 }

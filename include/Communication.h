@@ -55,15 +55,21 @@ class Communication
      */
     Utils::ReturnCodes Connect();
     /**
-     * @brief Get socket descriptor
-     *
-     * @return Socket descriptor
-     */
-    int GetSocketDescriptor();
-    /**
      * @brief Authenticate user on the server
      *
      * @return IMAPCL_SUCCESS if nothing failed
      */
     Utils::ReturnCodes Authenticate(const std::string &authFilePath);
+    /**
+     * @brief Logout user from session
+     *
+     * @return IMAPCL_SUCCESS if nothing failed
+     */
+    Utils::ReturnCodes Logout();
+    /**
+     * @brief Get socket descriptor
+     *
+     * @return Socket descriptor
+     */
+    int GetSocketDescriptor();
 };
