@@ -29,9 +29,11 @@ class Communication
     std::string Username;
     std::string Password;
     std::string Buffer;
+    std::string FullResponse;
+    int CurrentTagNumber;
 
   public:
-    Communication();
+    Communication(const std::string &username, const std::string &password);
     ~Communication();
     /**
      * @brief Get address info about host
@@ -49,6 +51,10 @@ class Communication
      */
     Utils::ReturnCodes CreateSocket();
     /**
+     *
+     */
+    void ReceiveResponse();
+    /**
      * @brief Connect to socket
      *
      * @return IMAPCL_SUCCESS if nothing failed, otherwise SOCKET_CONNECTING
@@ -59,7 +65,7 @@ class Communication
      *
      * @return IMAPCL_SUCCESS if nothing failed
      */
-    Utils::ReturnCodes Authenticate(const std::string &authFilePath);
+    Utils::ReturnCodes Authenticate();
     /**
      * @brief Logout user from session
      *

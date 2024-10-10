@@ -11,7 +11,6 @@
 #include <arpa/inet.h>
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -22,27 +21,41 @@
 
 int main(int argc, char **argv)
 {
-    std::string buffer("", 1024);
+    /**
+     * TODO:
+     *
+     * Check current tag + OK in every response
+     * Data transmitted by the server to the client and status responses
+     * that do not indicate command completion are prefixed with the token
+     * "*", and are called untagged responses.
+     *
+     * Retrieve UIDVality, store it and everytime you connect after that,
+     * check retrieved UIDV against the stored one
+     * If it did not change, check if the mail is downloaded, if not download it
+     * If it did, remove all mail and download everything again
+     *
+     * -n
+     * TAG SELECT MAILBOX
+     * TAG SEARCH UNSEEN -> extract UIDs of unseen messages
+     * TAG FETCH one by one from numbers extracted above
+     *
+     * TAG SELECT MAILBOX
+     * TAG SEARCH ALL -> extract UIDs of all messages
+     * compare which are downloaded locally and which are not
+     * TAG FETCH one by one from numbers which are not local
+     */
     Utils::Arguments arguments;
-    if (Utils::CheckArguments(argc, argv, arguments))
-        return Utils::IMAPCL_FAILURE;
-#ifdef DEBUG
-    std::cerr << "---------------DEBUG---------------"
-              << "\n";
-    std::cerr << arguments.OutDirectoryPath << "\n";
-    std::cerr << arguments.AuthFilePath << "\n";
-    std::cerr << arguments.ServerAddress << "\n";
-    std::cerr << "-----------------------------------"
-              << "\n";
-#endif
-    Communication communication;
+    Utils::ReturnCodes returnCode = Utils::CheckArguments(argc, argv, arguments);
+    if (returnCode)
+        return returnCode;
+    Communication communication(arguments.Username, arguments.Password);
     if (communication.GetHostAddressInfo(arguments.ServerAddress, arguments.Port))
         return Utils::SERVER_BAD_HOST;
     if (communication.CreateSocket())
         return Utils::SOCKET_CREATING;
     if (communication.Connect())
         return Utils::SOCKET_CONNECTING;
-    if (communication.Authenticate(arguments.AuthFilePath))
+    if (communication.Authenticate())
         return Utils::AUTH_FILE_OPEN;
     if (communication.Logout())
         return Utils::AUTH_FILE_OPEN;

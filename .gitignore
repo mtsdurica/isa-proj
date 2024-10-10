@@ -34,3 +34,4 @@
 imapcl
 tests/tests
 auth
+maildir/

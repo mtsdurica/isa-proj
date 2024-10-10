@@ -11,14 +11,18 @@
 #pragma once
 
 #include <cstdlib>
+#include <fstream>
 #include <getopt.h>
 #include <iostream>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <regex>
 #include <string>
 #include <sys/socket.h>
+#include <sys/stat.h>
 
 #define DEBUG
+#define BUFFER_SIZE 1024
 
 namespace Utils
 {
@@ -29,13 +33,16 @@ typedef enum ReturnCodes
     IMAPCL_FAILURE,
     ARGS_MISSING_SERVER,
     ARGS_MISSING_REQUIRED,
+    ARGS_MISSING_OPTION,
     ARGS_UNKNOWN_ARGUMENT,
     SOCKET_CREATING,
     SOCKET_CONNECTING,
     SERVER_BAD_HOST,
     AUTH_FILE_OPEN,
+    AUTH_FILE_NONEXISTENT,
     AUTH_INVALID_CREDENTIALS,
     AUTH_MISSING_CREDENTIALS,
+    OUT_DIR_NONEXISTENT
 } ReturnCodes;
 
 typedef struct Arguments
@@ -50,10 +57,13 @@ typedef struct Arguments
     std::string AuthFilePath;
     std::string MailBox;
     std::string OutDirectoryPath;
+    std::string Username;
+    std::string Password;
 
     Arguments()
-        : Port(""), Encrypted(false), CertificateFile(""), CertificateFileDirectoryPath(""), OnlyNewMails(false),
-          OnlyMailHeaders(false), AuthFilePath(""), MailBox("INBOX"), OutDirectoryPath("") {};
+        : Port("143"), Encrypted(false), CertificateFile(""), CertificateFileDirectoryPath(""), OnlyNewMails(false),
+          OnlyMailHeaders(false), AuthFilePath(""), MailBox("INBOX"), OutDirectoryPath(""), Username(""),
+          Password("") {};
 } Arguments;
 
 inline void PrintError(ReturnCodes returnCode, std::string errorMessage)
@@ -61,49 +71,72 @@ inline void PrintError(ReturnCodes returnCode, std::string errorMessage)
     std::cerr << "\033[1m" << "[" << returnCode << "] " << "ERROR: " << "\033[0m" << errorMessage << "\n";
 }
 
-inline Utils::ReturnCodes CheckArguments(int argc, char **argv, Arguments &arguments)
+inline Utils::ReturnCodes CheckArguments(int argc, char **args, Arguments &arguments)
 {
     int opt;
-    bool helpFlag = false;
     bool serverAddressSet = false;
     bool authFileSet = false;
     bool outDirectorySet = false;
     opterr = 0;
-    struct option longOptions[] = {{"help", no_argument, 0, 0},
-                                   {0, required_argument, 0, 'p'},
-                                   {0, no_argument, 0, 'T'},
-                                   {0, required_argument, 0, 'c'},
-                                   {0, required_argument, 0, 'C'},
-                                   {0, no_argument, 0, 'n'},
-                                   {0, no_argument, 0, 'h'},
-                                   {0, required_argument, 0, 'a'},
-                                   {0, required_argument, 0, 'b'},
-                                   {0, required_argument, 0, 'o'},
-                                   {0, 0, 0, 0}};
-    int optionIndex = 0;
-    while ((opt = getopt_long(argc, argv, "p:c:C:a:b:o:Tnh0", longOptions, &optionIndex)) != -1)
+    while ((opt = getopt(argc, args, "a:o:p:c:C:b:Tnh")) != -1)
     {
         switch (opt)
         {
-        case 0: {
-            std::string argName = longOptions[optionIndex].name;
-            if (argName == "help")
-            {
-                std::cerr << "Option " << longOptions[optionIndex].name << "\n";
-                helpFlag = true;
-            }
-            break;
-        }
         case 'p':
+            if (optarg[0] == '-')
+            {
+                switch (optarg[1])
+                {
+                case 'o':
+                case 'a':
+                case 'c':
+                case 'C':
+                case 'b':
+                case 'n':
+                case 'h':
+                    PrintError(Utils::ARGS_MISSING_OPTION, "Missing required argument option");
+                    return Utils::ARGS_MISSING_OPTION;
+                }
+            }
             arguments.Port = optarg;
             break;
         case 'T':
             arguments.Encrypted = true;
             break;
         case 'c':
+            if (optarg[0] == '-')
+            {
+                switch (optarg[1])
+                {
+                case 'o':
+                case 'p':
+                case 'a':
+                case 'C':
+                case 'b':
+                case 'n':
+                case 'h':
+                    PrintError(Utils::ARGS_MISSING_OPTION, "Missing required argument option");
+                    return Utils::ARGS_MISSING_OPTION;
+                }
+            }
             arguments.CertificateFile = optarg;
             break;
         case 'C':
+            if (optarg[0] == '-')
+            {
+                switch (optarg[1])
+                {
+                case 'o':
+                case 'p':
+                case 'c':
+                case 'a':
+                case 'b':
+                case 'n':
+                case 'h':
+                    PrintError(Utils::ARGS_MISSING_OPTION, "Missing required argument option");
+                    return Utils::ARGS_MISSING_OPTION;
+                }
+            }
             arguments.CertificateFileDirectoryPath = optarg;
             break;
         case 'n':
@@ -113,39 +146,81 @@ inline Utils::ReturnCodes CheckArguments(int argc, char **argv, Arguments &argum
             arguments.OnlyMailHeaders = true;
             break;
         case 'a':
+            if (optarg[0] == '-')
+            {
+                switch (optarg[1])
+                {
+                case 'o':
+                case 'p':
+                case 'c':
+                case 'C':
+                case 'b':
+                case 'n':
+                case 'h':
+                    PrintError(Utils::ARGS_MISSING_OPTION, "Missing required argument option");
+                    return Utils::ARGS_MISSING_OPTION;
+                }
+            }
             arguments.AuthFilePath = optarg;
             authFileSet = true;
             break;
         case 'b':
+            if (optarg[0] == '-')
+            {
+                switch (optarg[1])
+                {
+                case 'o':
+                case 'p':
+                case 'c':
+                case 'C':
+                case 'a':
+                case 'n':
+                case 'h':
+                    PrintError(Utils::ARGS_MISSING_OPTION, "Missing required argument option");
+                    return Utils::ARGS_MISSING_OPTION;
+                }
+            }
             arguments.MailBox = optarg;
             break;
         case 'o':
+            if (optarg[0] == '-')
+            {
+                switch (optarg[1])
+                {
+                case 'a':
+                case 'p':
+                case 'c':
+                case 'C':
+                case 'b':
+                case 'n':
+                case 'h':
+                    PrintError(Utils::ARGS_MISSING_OPTION, "Missing required argument option");
+                    return Utils::ARGS_MISSING_OPTION;
+                }
+            }
             arguments.OutDirectoryPath = optarg;
             outDirectorySet = true;
             break;
         case '?':
-            std::cerr << "DEEZ" << opt << "\n";
+            // Handling '-a' or '-o' being last argument and without its required option
+            if (optopt == 'a' || optopt == 'o')
+            {
+                PrintError(Utils::ARGS_MISSING_OPTION, "Missing required argument option");
+                return Utils::ARGS_MISSING_OPTION;
+            }
+            PrintError(Utils::ARGS_UNKNOWN_ARGUMENT, "Unknown argument");
             return Utils::ARGS_UNKNOWN_ARGUMENT;
-            break;
         default:
-            std::cerr << "UNKNOWN ARGS!" << "\n";
+            PrintError(Utils::ARGS_UNKNOWN_ARGUMENT, "Unknown argument");
             return Utils::ARGS_UNKNOWN_ARGUMENT;
-            break;
         }
     }
 
     // TODO: parsing of server address
     for (int i = optind; i < argc; i++)
     {
-        arguments.ServerAddress = argv[i];
+        arguments.ServerAddress = args[i];
         serverAddressSet = true;
-    }
-
-    if (helpFlag)
-    {
-        // print help
-        std::cerr << "deez" << "\n";
-        return Utils::IMAPCL_SUCCESS;
     }
 
     if (!serverAddressSet)
@@ -154,17 +229,71 @@ inline Utils::ReturnCodes CheckArguments(int argc, char **argv, Arguments &argum
         return Utils::ARGS_MISSING_SERVER;
     }
 
-    if (!authFileSet)
+    if (!outDirectorySet)
     {
-        PrintError(Utils::ARGS_MISSING_REQUIRED, "Missing required arguments");
+        PrintError(Utils::ARGS_MISSING_REQUIRED, "Missing required argument");
         return Utils::ARGS_MISSING_REQUIRED;
     }
 
-    if (!outDirectorySet)
+    if (!authFileSet)
     {
-        PrintError(Utils::ARGS_MISSING_REQUIRED, "Missing required arguments");
+        PrintError(Utils::ARGS_MISSING_REQUIRED, "Missing required argument");
         return Utils::ARGS_MISSING_REQUIRED;
     }
+
+    if (outDirectorySet)
+    {
+        struct stat buffer;
+        if (stat(arguments.OutDirectoryPath.c_str(), &buffer) != 0)
+        {
+            Utils::PrintError(Utils::OUT_DIR_NONEXISTENT, "Output directory does not exist");
+            return Utils::OUT_DIR_NONEXISTENT;
+        }
+    }
+
+    if (authFileSet)
+    {
+        // Checking if auth file exists
+        struct stat buffer;
+        if (stat(arguments.AuthFilePath.c_str(), &buffer) != 0)
+        {
+            Utils::PrintError(Utils::AUTH_FILE_NONEXISTENT, "Auth file does not exist");
+            return Utils::AUTH_FILE_NONEXISTENT;
+        }
+        // Parsing auth file
+        std::ifstream authFile(arguments.AuthFilePath);
+        std::string line;
+        if (!authFile.is_open())
+        {
+            Utils::PrintError(Utils::AUTH_FILE_OPEN, "Error opening file");
+            return Utils::AUTH_FILE_OPEN;
+        }
+        while (std::getline(authFile, line))
+        {
+            std::smatch matched;
+            std::regex usernameRegex("username\\s=\\s(.+)");
+            if (std::regex_search(line, matched, usernameRegex))
+                arguments.Username = matched[1];
+            std::regex passwordRegex("password\\s=\\s(.+)");
+            if (std::regex_search(line, matched, passwordRegex))
+                arguments.Password = matched[1];
+        }
+        authFile.close();
+        if (arguments.Username == "")
+        {
+            Utils::PrintError(Utils::AUTH_MISSING_CREDENTIALS, "Missing username");
+            return Utils::AUTH_MISSING_CREDENTIALS;
+        }
+        if (arguments.Password == "")
+        {
+            Utils::PrintError(Utils::AUTH_MISSING_CREDENTIALS, "Missing password");
+            return Utils::AUTH_MISSING_CREDENTIALS;
+        }
+    }
+    // Setting default port if encryption is used
+    if (arguments.Encrypted)
+        if (arguments.Port == "143")
+            arguments.Port = "993";
 
     return Utils::IMAPCL_SUCCESS;
 }

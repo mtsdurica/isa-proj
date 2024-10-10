@@ -9,16 +9,16 @@
  *
  */
 #include <cstdlib>
-#include <fstream>
 #include <regex>
 #include <string>
 #include <sys/socket.h>
 
 #include "../include/Communication.h"
 
-Communication::Communication() : SocketDescriptor(-1), Server(nullptr), Username(""), Password("")
+Communication::Communication(const std::string &username, const std::string &password)
+    : SocketDescriptor(-1), Server(nullptr), Username(username), Password(password), Buffer(std::string("", 1024)),
+      FullResponse(""), CurrentTagNumber(1)
 {
-    this->Buffer = std::string("", 1024);
 }
 
 Communication::~Communication()
@@ -57,6 +57,22 @@ Utils::ReturnCodes Communication::CreateSocket()
     return Utils::IMAPCL_SUCCESS;
 }
 
+void Communication::ReceiveResponse()
+{
+    while (true)
+    {
+        unsigned long int received = recv(this->SocketDescriptor, this->Buffer.data(), BUFFER_SIZE, 0);
+        if (received != 0)
+        {
+            std::cerr << "RECV: " << std::to_string(received) << "\n";
+            this->FullResponse += this->Buffer.substr(0, received);
+            if (received < BUFFER_SIZE)
+                break;
+        }
+    }
+    this->Buffer = std::string("", BUFFER_SIZE);
+}
+
 Utils::ReturnCodes Communication::Connect()
 {
     if (connect(this->SocketDescriptor, Server->ai_addr, Server->ai_addrlen) == -1)
@@ -64,81 +80,45 @@ Utils::ReturnCodes Communication::Connect()
         Utils::PrintError(Utils::SOCKET_CONNECTING, "Connecting to socket failed");
         return Utils::SOCKET_CONNECTING;
     }
-    while (true)
-    {
-        int received = recv(this->SocketDescriptor, this->Buffer.data(), this->Buffer.length(), 0);
-        if (received != 0)
-        {
-            std::cerr << "RECV: " << std::to_string(received) << "\n";
-            std::cout << this->Buffer.substr(0, received);
-            break;
-        }
-    }
+    this->ReceiveResponse();
+    // TODO: FIX THIS SHIT
+    std::regex responseRegex(".*");
+    std::cerr << std::regex_match(this->FullResponse, responseRegex) << "\n";
+    std::cerr << this->FullResponse;
+    this->FullResponse = "";
     return Utils::IMAPCL_SUCCESS;
 }
 
-Utils::ReturnCodes Communication::Authenticate(const std::string &authFilePath)
+Utils::ReturnCodes Communication::Authenticate()
 {
-    std::ifstream authFile(authFilePath);
-    std::string line;
-    if (!authFile.is_open())
-    {
-        Utils::PrintError(Utils::AUTH_FILE_OPEN, "Error opening file");
-        return Utils::AUTH_FILE_OPEN;
-    }
-    while (std::getline(authFile, line))
-    {
-        std::smatch matched;
-        std::regex usernameRegex("username\\s=\\s(.+)");
-        if (std::regex_search(line, matched, usernameRegex))
-            this->Username = matched[1];
-        std::regex passwordRegex("password\\s=\\s(.+)");
-        if (std::regex_search(line, matched, passwordRegex))
-            this->Password = matched[1];
-    }
-    authFile.close();
-    if (this->Username == "")
-    {
-        Utils::PrintError(Utils::AUTH_MISSING_CREDENTIALS, "Missing username");
-        return Utils::AUTH_MISSING_CREDENTIALS;
-    }
-    if (this->Password == "")
-    {
-        Utils::PrintError(Utils::AUTH_MISSING_CREDENTIALS, "Missing password");
-        return Utils::AUTH_MISSING_CREDENTIALS;
-    }
-    this->Buffer = "A1 login";
+    this->Buffer = "A" + std::to_string(this->CurrentTagNumber) + " LOGIN";
     this->Buffer += " " + this->Username + " " + this->Password + "\n";
     send(this->SocketDescriptor, this->Buffer.c_str(), this->Buffer.length(), 0);
-    this->Buffer = std::string("", 1024);
-    while (true)
+    this->Buffer = std::string("", BUFFER_SIZE);
+    this->ReceiveResponse();
+    std::regex responseRegex("\\*\\sOK\\s.*");
+    if (std::regex_match(this->FullResponse.begin(), this->FullResponse.end(), responseRegex))
     {
-        int received = recv(this->SocketDescriptor, this->Buffer.data(), this->Buffer.length(), 0);
-        if (received != 0)
-        {
-            std::cerr << "RECV: " << std::to_string(received) << "\n";
-            std::cout << this->Buffer.substr(0, received);
-            break;
-        }
+        std::cerr << this->FullResponse;
     }
+    this->FullResponse = "";
+    this->CurrentTagNumber++;
     return Utils::IMAPCL_SUCCESS;
 }
 
 Utils::ReturnCodes Communication::Logout()
 {
-    this->Buffer = "A1 logout\n";
+    this->Buffer = "A" + std::to_string(this->CurrentTagNumber) + " LOGOUT\n";
     send(this->SocketDescriptor, this->Buffer.c_str(), this->Buffer.length(), 0);
-    this->Buffer = std::string("", 1024);
-    while (true)
+    this->Buffer = std::string("", BUFFER_SIZE);
+    this->ReceiveResponse();
+    std::regex responseRegex("\\*\\sOK\\s.*");
+    if (std::regex_match(this->FullResponse.begin(), this->FullResponse.end(), responseRegex))
     {
-        int received = recv(this->SocketDescriptor, this->Buffer.data(), this->Buffer.length(), 0);
-        if (received != 0)
-        {
-            std::cerr << "RECV: " << std::to_string(received) << "\n";
-            std::cout << this->Buffer.substr(0, received);
-            break;
-        }
+        std::cerr << this->FullResponse;
     }
+    this->FullResponse = "";
+    this->CurrentTagNumber++;
     return Utils::IMAPCL_SUCCESS;
 }
 
