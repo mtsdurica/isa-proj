@@ -15,9 +15,10 @@
 
 #include "../include/Communication.h"
 
-Communication::Communication(const std::string &username, const std::string &password)
+Communication::Communication(const std::string &username, const std::string &password,
+                             const std::string &outDirectoryPath, const std::string &mailBox)
     : SocketDescriptor(-1), Server(nullptr), Username(username), Password(password), Buffer(std::string("", 1024)),
-      FullResponse(""), CurrentTagNumber(1)
+      FullResponse(""), OutDirectoryPath(outDirectoryPath), MailBox(mailBox), CurrentTagNumber(1)
 {
 }
 
@@ -83,7 +84,8 @@ Utils::ReturnCodes Communication::Connect()
     this->ReceiveResponse();
     if (Utils::ValidateResponse(this->FullResponse, "\\*\\sOK"))
     {
-        std::cerr << this->FullResponse;
+        Utils::PrintError(Utils::INVALID_RESPONSE, "Response is invalid");
+        return Utils::INVALID_RESPONSE;
     }
     this->FullResponse = "";
     return Utils::IMAPCL_SUCCESS;
@@ -96,10 +98,77 @@ Utils::ReturnCodes Communication::Authenticate()
     send(this->SocketDescriptor, this->Buffer.c_str(), this->Buffer.length(), 0);
     this->Buffer = std::string("", BUFFER_SIZE);
     this->ReceiveResponse();
-    if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
+    if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sNO"))
     {
-        std::cerr << this->FullResponse;
+        if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
+        {
+            Utils::PrintError(Utils::INVALID_RESPONSE, "Response is invalid");
+            return Utils::INVALID_RESPONSE;
+        }
+        else
+        {
+            this->FullResponse = "";
+            this->CurrentTagNumber++;
+            return Utils::IMAPCL_SUCCESS;
+        }
+        Utils::PrintError(Utils::AUTH_INVALID_CREDENTIALS, "Bad credentials");
+        return Utils::AUTH_INVALID_CREDENTIALS;
     }
+    return Utils::IMAPCL_SUCCESS;
+}
+
+Utils::ReturnCodes Communication::FetchMail()
+{
+    this->Buffer = "A" + std::to_string(this->CurrentTagNumber) + " SELECT " + this->MailBox + "\n";
+    send(this->SocketDescriptor, this->Buffer.c_str(), this->Buffer.length(), 0);
+    this->Buffer = std::string("", BUFFER_SIZE);
+    this->ReceiveResponse();
+    std::cerr << this->FullResponse;
+    if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
+        std::cerr << this->FullResponse;
+    this->FullResponse = "";
+    this->CurrentTagNumber++;
+
+    this->Buffer = "A" + std::to_string(this->CurrentTagNumber) + " SEARCH ALL\n";
+    send(this->SocketDescriptor, this->Buffer.c_str(), this->Buffer.length(), 0);
+    this->Buffer = std::string("", BUFFER_SIZE);
+    this->ReceiveResponse();
+    std::cerr << this->FullResponse;
+    if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
+        std::cerr << this->FullResponse;
+    std::regex regex("\\b[0-9]+");
+    std::smatch match;
+    std::string::const_iterator start(this->FullResponse.cbegin());
+    std::vector<std::string> messageUIDs;
+    while (std::regex_search(start, this->FullResponse.cend(), match, regex))
+    {
+        std::cerr << match[0] << "\n";
+        messageUIDs.push_back(match[0]);
+        start = match.suffix().first;
+    }
+    this->FullResponse = "";
+    this->CurrentTagNumber++;
+
+    for (auto x : messageUIDs)
+    {
+        // Retrieving size of each message
+        this->Buffer = "A" + std::to_string(this->CurrentTagNumber) + " FETCH " + x + "RFC822.SIZE\n";
+        send(this->SocketDescriptor, this->Buffer.c_str(), this->Buffer.length(), 0);
+        this->Buffer = std::string("", BUFFER_SIZE);
+        this->ReceiveResponse();
+        std::cerr << this->FullResponse;
+        if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
+            std::cerr << this->FullResponse;
+        this->FullResponse = "";
+        this->CurrentTagNumber++;
+        // Allocating Buffer
+    }
+
+    this->Buffer = "A" + std::to_string(this->CurrentTagNumber) + " FETCH 1 BODY[]\n";
+    send(this->SocketDescriptor, this->Buffer.c_str(), this->Buffer.length(), 0);
+    this->Buffer = std::string("", BUFFER_SIZE);
+    this->ReceiveResponse();
+    std::cerr << this->FullResponse;
     this->FullResponse = "";
     this->CurrentTagNumber++;
     return Utils::IMAPCL_SUCCESS;
@@ -113,7 +182,8 @@ Utils::ReturnCodes Communication::Logout()
     this->ReceiveResponse();
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
     {
-        std::cerr << this->FullResponse;
+        Utils::PrintError(Utils::INVALID_RESPONSE, "Response is invalid");
+        return Utils::INVALID_RESPONSE;
     }
     this->FullResponse = "";
     this->CurrentTagNumber++;

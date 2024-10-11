@@ -30,10 +30,13 @@ class Communication
     std::string Password;
     std::string Buffer;
     std::string FullResponse;
+    std::string OutDirectoryPath;
+    std::string MailBox;
     int CurrentTagNumber;
 
   public:
-    Communication(const std::string &username, const std::string &password);
+    Communication(const std::string &username, const std::string &password, const std::string &outDirectoryPath,
+                  const std::string &mailBox);
     ~Communication();
     /**
      * @brief Get address info about host
@@ -66,6 +69,10 @@ class Communication
      * @return IMAPCL_SUCCESS if nothing failed
      */
     Utils::ReturnCodes Authenticate();
+    /**
+     *
+     */
+    Utils::ReturnCodes FetchMail();
     /**
      * @brief Logout user from session
      *

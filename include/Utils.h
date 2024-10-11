@@ -42,7 +42,8 @@ typedef enum ReturnCodes
     AUTH_FILE_NONEXISTENT,
     AUTH_INVALID_CREDENTIALS,
     AUTH_MISSING_CREDENTIALS,
-    OUT_DIR_NONEXISTENT
+    OUT_DIR_NONEXISTENT,
+    INVALID_RESPONSE
 } ReturnCodes;
 
 typedef struct Arguments
@@ -66,7 +67,13 @@ typedef struct Arguments
           Password(""){};
 } Arguments;
 
-inline void PrintError(ReturnCodes returnCode, std::string errorMessage)
+/**
+ * @brief Print error message to standard error
+ *
+ * @param returnCode Error return code
+ * @param errorMessage Error message to be printed
+ */
+inline void PrintError(ReturnCodes returnCode, const std::string &errorMessage)
 {
     std::cerr << "\033[1m"
               << "[" << returnCode << "] "
@@ -74,13 +81,30 @@ inline void PrintError(ReturnCodes returnCode, std::string errorMessage)
               << "\033[0m" << errorMessage << "\n";
 }
 
+/**
+ * @brief Validate response recieved from the IMAP server
+ *
+ * @param response Response from the server
+ * @param expressionString String containing validation expression
+ *
+ * @return False if response is valid
+ */
 inline bool ValidateResponse(const std::string &response, const std::string &expressionString)
 {
     std::regex expression(expressionString);
     std::smatch match;
-    return std::regex_search(response, match, expression);
+    return (!std::regex_search(response, match, expression));
 }
 
+/**
+ * @brief Check command line arguments
+ *
+ * @param argc Number of arguments
+ * @param args Array of C strings containing arguments
+ * @param arguments Configuration structure where parsed arguments will be stored
+ *
+ * @return IMAPCL_SUCCESS if nothing failed, otherwise a positive integer
+ */
 inline Utils::ReturnCodes CheckArguments(int argc, char **args, Arguments &arguments)
 {
     int opt;

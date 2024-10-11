@@ -8,13 +8,6 @@
  * @copyright Copyright (c) 2024
  *
  */
-#include <arpa/inet.h>
-#include <cstdlib>
-#include <cstring>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 #include "../include/Communication.h"
 #include "../include/Utils.h"
@@ -23,11 +16,6 @@ int main(int argc, char **argv)
 {
     /**
      * TODO:
-     *
-     * Check current tag + OK in every response
-     * Data transmitted by the server to the client and status responses
-     * that do not indicate command completion are prefixed with the token
-     * "*", and are called untagged responses.
      *
      * Retrieve UIDVality, store it and everytime you connect after that,
      * check retrieved UIDV against the stored one
@@ -48,7 +36,7 @@ int main(int argc, char **argv)
     Utils::ReturnCodes returnCode = Utils::CheckArguments(argc, argv, arguments);
     if (returnCode)
         return returnCode;
-    Communication communication(arguments.Username, arguments.Password);
+    Communication communication(arguments.Username, arguments.Password, arguments.OutDirectoryPath, arguments.MailBox);
     if (communication.GetHostAddressInfo(arguments.ServerAddress, arguments.Port))
         return Utils::SERVER_BAD_HOST;
     if (communication.CreateSocket())
@@ -57,7 +45,9 @@ int main(int argc, char **argv)
         return Utils::SOCKET_CONNECTING;
     if (communication.Authenticate())
         return Utils::AUTH_FILE_OPEN;
+    if (communication.FetchMail())
+        return 1;
     if (communication.Logout())
-        return Utils::AUTH_FILE_OPEN;
+        return Utils::INVALID_RESPONSE;
     return Utils::IMAPCL_SUCCESS;
 }
