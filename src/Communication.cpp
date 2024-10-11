@@ -81,10 +81,10 @@ Utils::ReturnCodes Communication::Connect()
         return Utils::SOCKET_CONNECTING;
     }
     this->ReceiveResponse();
-    // TODO: FIX THIS SHIT
-    std::regex responseRegex(".*");
-    std::cerr << std::regex_match(this->FullResponse, responseRegex) << "\n";
-    std::cerr << this->FullResponse;
+    if (Utils::ValidateResponse(this->FullResponse, "\\*\\sOK"))
+    {
+        std::cerr << this->FullResponse;
+    }
     this->FullResponse = "";
     return Utils::IMAPCL_SUCCESS;
 }
@@ -96,8 +96,7 @@ Utils::ReturnCodes Communication::Authenticate()
     send(this->SocketDescriptor, this->Buffer.c_str(), this->Buffer.length(), 0);
     this->Buffer = std::string("", BUFFER_SIZE);
     this->ReceiveResponse();
-    std::regex responseRegex("\\*\\sOK\\s.*");
-    if (std::regex_match(this->FullResponse.begin(), this->FullResponse.end(), responseRegex))
+    if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
     {
         std::cerr << this->FullResponse;
     }
@@ -112,8 +111,7 @@ Utils::ReturnCodes Communication::Logout()
     send(this->SocketDescriptor, this->Buffer.c_str(), this->Buffer.length(), 0);
     this->Buffer = std::string("", BUFFER_SIZE);
     this->ReceiveResponse();
-    std::regex responseRegex("\\*\\sOK\\s.*");
-    if (std::regex_match(this->FullResponse.begin(), this->FullResponse.end(), responseRegex))
+    if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
     {
         std::cerr << this->FullResponse;
     }

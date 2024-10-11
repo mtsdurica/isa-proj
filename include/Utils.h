@@ -63,12 +63,22 @@ typedef struct Arguments
     Arguments()
         : Port("143"), Encrypted(false), CertificateFile(""), CertificateFileDirectoryPath(""), OnlyNewMails(false),
           OnlyMailHeaders(false), AuthFilePath(""), MailBox("INBOX"), OutDirectoryPath(""), Username(""),
-          Password("") {};
+          Password(""){};
 } Arguments;
 
 inline void PrintError(ReturnCodes returnCode, std::string errorMessage)
 {
-    std::cerr << "\033[1m" << "[" << returnCode << "] " << "ERROR: " << "\033[0m" << errorMessage << "\n";
+    std::cerr << "\033[1m"
+              << "[" << returnCode << "] "
+              << "ERROR: "
+              << "\033[0m" << errorMessage << "\n";
+}
+
+inline bool ValidateResponse(const std::string &response, const std::string &expressionString)
+{
+    std::regex expression(expressionString);
+    std::smatch match;
+    return std::regex_search(response, match, expression);
 }
 
 inline Utils::ReturnCodes CheckArguments(int argc, char **args, Arguments &arguments)

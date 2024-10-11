@@ -15,11 +15,11 @@ all: build ./$(TARGET)
 
 $(OBJ_DIR)/%.o: %.cpp $(INCLUDE_DIR)/*.h
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) $(TEST_FLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS)  -c $< -o $@ $(TEST_FLAGS)
 
 ./$(TARGET): $(OBJECTS)
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) $(TEST_FLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS)  -o $@ $^ $(TEST_FLAGS)
 
 build:
 	@mkdir -p $(OBJ_DIR)
