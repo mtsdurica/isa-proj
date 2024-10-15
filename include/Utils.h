@@ -43,6 +43,8 @@ typedef enum ReturnCodes
     AUTH_INVALID_CREDENTIALS,
     AUTH_MISSING_CREDENTIALS,
     OUT_DIR_NONEXISTENT,
+    VALIDITY_FILE_OPEN,
+    CANT_ACCESS_MAILBOX,
     INVALID_RESPONSE
 } ReturnCodes;
 
@@ -64,7 +66,7 @@ typedef struct Arguments
     Arguments()
         : Port("143"), Encrypted(false), CertificateFile(""), CertificateFileDirectoryPath(""), OnlyNewMails(false),
           OnlyMailHeaders(false), AuthFilePath(""), MailBox("INBOX"), OutDirectoryPath(""), Username(""),
-          Password(""){};
+          Password("") {};
 } Arguments;
 
 /**
@@ -73,12 +75,13 @@ typedef struct Arguments
  * @param returnCode Error return code
  * @param errorMessage Error message to be printed
  */
-inline void PrintError(ReturnCodes returnCode, const std::string &errorMessage)
+inline Utils::ReturnCodes PrintError(ReturnCodes returnCode, const std::string &errorMessage)
 {
     std::cerr << "\033[1m"
               << "[" << returnCode << "] "
               << "ERROR: "
               << "\033[0m" << errorMessage << "\n";
+    return returnCode;
 }
 
 /**

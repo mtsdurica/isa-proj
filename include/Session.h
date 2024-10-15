@@ -1,7 +1,7 @@
 /**
- * @file Communication.h
+ * @file Session.h
  * @author  Matúš Ďurica (xduric06@stud.fit.vutbr.cz)
- * @brief Contains declaration of Communication class
+ * @brief Contains declaration of Session class
  * @version 0.1
  * @date 2024-10-08
  *
@@ -21,7 +21,7 @@
 
 #include "../include/Utils.h"
 
-class Communication
+class Session
 {
   protected:
     int SocketDescriptor;    // Socket descriptor
@@ -33,11 +33,28 @@ class Communication
     std::string OutDirectoryPath;
     std::string MailBox;
     int CurrentTagNumber;
+    bool MailBoxValidated;
+    /**
+     * @brief Validate UIDValidity of a mailbox.
+     * If validity file does not exist, it is created and the UIDValidity is written to it. If it exists and UIDValidity
+     * does not match, MailBoxValidated variable is set to `true` and the mailbox will be redownloaded.
+     *
+     * @return IMAPCL_SUCCESS if nothing failed, otherwise VALIDITY_FILE_OPEN
+     */
+    Utils::ReturnCodes ValidateMailbox();
+    /**
+     * @brief Select mailbox from which to fetch mail.
+     *
+     * @return IMAPCL_SUCCESS if nothing failed, CANT_ACCESS_MAILBOX if the mailbox can not be accessed,
+     * VALIDITY_FILE_OPEN if the UIDValidity file can not be opened
+     */
+    Utils::ReturnCodes SelectMailbox();
+    std::vector<std::string> SearchMailbox(const std::string &searchKey);
 
   public:
-    Communication(const std::string &username, const std::string &password, const std::string &outDirectoryPath,
-                  const std::string &mailBox);
-    ~Communication();
+    Session(const std::string &username, const std::string &password, const std::string &outDirectoryPath,
+            const std::string &mailBox);
+    ~Session();
     /**
      * @brief Get address info about host
      *
@@ -56,7 +73,15 @@ class Communication
     /**
      *
      */
-    void ReceiveResponse();
+    void SendMessage(const std::string &message);
+    /**
+     *
+     */
+    void ReceiveUntaggedResponse();
+    /**
+     *
+     */
+    void ReceiveTaggedResponse();
     /**
      * @brief Connect to socket
      *
@@ -70,9 +95,12 @@ class Communication
      */
     Utils::ReturnCodes Authenticate();
     /**
+     * @brief Fetch all mail from a mailbox.
      *
+     * @return IMAPCL_SUCCESS if nothing failed, CANT_ACCESS_MAILBOX if the mailbox can not be accessed,
+     * VALIDITY_FILE_OPEN if the UIDValidity file can not be opened
      */
-    Utils::ReturnCodes FetchMail();
+    Utils::ReturnCodes FetchAllMail();
     /**
      * @brief Logout user from session
      *

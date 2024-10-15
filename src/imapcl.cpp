@@ -9,7 +9,7 @@
  *
  */
 
-#include "../include/Communication.h"
+#include "../include/Session.h"
 #include "../include/Utils.h"
 
 int main(int argc, char **argv)
@@ -36,18 +36,18 @@ int main(int argc, char **argv)
     Utils::ReturnCodes returnCode = Utils::CheckArguments(argc, argv, arguments);
     if (returnCode)
         return returnCode;
-    Communication communication(arguments.Username, arguments.Password, arguments.OutDirectoryPath, arguments.MailBox);
-    if (communication.GetHostAddressInfo(arguments.ServerAddress, arguments.Port))
+    Session session(arguments.Username, arguments.Password, arguments.OutDirectoryPath, arguments.MailBox);
+    if (session.GetHostAddressInfo(arguments.ServerAddress, arguments.Port))
         return Utils::SERVER_BAD_HOST;
-    if (communication.CreateSocket())
+    if (session.CreateSocket())
         return Utils::SOCKET_CREATING;
-    if (communication.Connect())
+    if (session.Connect())
         return Utils::SOCKET_CONNECTING;
-    if (communication.Authenticate())
+    if (session.Authenticate())
         return Utils::AUTH_FILE_OPEN;
-    if (communication.FetchMail())
+    if (session.FetchAllMail())
         return 1;
-    if (communication.Logout())
+    if (session.Logout())
         return Utils::INVALID_RESPONSE;
     return Utils::IMAPCL_SUCCESS;
 }
