@@ -70,8 +70,15 @@ typedef struct Arguments
     Arguments()
         : Port("143"), Encrypted(false), CertificateFile(""), CertificateFileDirectoryPath("/etc/ssl/certs/"),
           OnlyNewMails(false), OnlyMailHeaders(false), AuthFilePath(""), MailBox("INBOX"), OutDirectoryPath(""),
-          Username(""), Password(""){};
+          Username(""), Password("") {};
 } Arguments;
+
+inline void PrintDebug(const std::string &debugStr)
+{
+    std::cerr << "---===     DEBUG    ===---" << "\n";
+    std::cerr << debugStr << "\n";
+    std::cerr << "---=== END OF DEBUG ===---" << "\n";
+}
 
 /**
  * @brief Print error message to standard error

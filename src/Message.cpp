@@ -1,8 +1,9 @@
 #include "../include/Message.h"
 
 #include <fstream>
-#include <iostream>
 #include <regex>
+
+#include "../include/Utils.h"
 
 Message::Message(const std::string &messageUID, const std::string &responseString)
     : MessageUID(messageUID), ResponseString(responseString), FileName(""), MessageBody("")
@@ -55,7 +56,7 @@ void Message::ParseMessageBody()
 void Message::DumpToFile(const std::string &outDirectoryPath)
 {
 #ifdef DEBUG
-    std::cerr << this->MessageBody.length() << "\n";
+    Utils::PrintDebug("Message body size: " + std::to_string(this->MessageBody.length()));
 #endif // DEBUG
     std::ofstream file(outDirectoryPath + "/" + this->FileName);
     file << this->MessageBody;
