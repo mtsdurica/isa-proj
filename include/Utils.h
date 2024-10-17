@@ -64,9 +64,9 @@ typedef struct Arguments
     std::string Password;
 
     Arguments()
-        : Port("143"), Encrypted(false), CertificateFile(""), CertificateFileDirectoryPath(""), OnlyNewMails(false),
-          OnlyMailHeaders(false), AuthFilePath(""), MailBox("INBOX"), OutDirectoryPath(""), Username(""),
-          Password("") {};
+        : Port("143"), Encrypted(false), CertificateFile(""), CertificateFileDirectoryPath("/etc/ssl/certs/"),
+          OnlyNewMails(false), OnlyMailHeaders(false), AuthFilePath(""), MailBox("INBOX"), OutDirectoryPath(""),
+          Username(""), Password("") {};
 } Arguments;
 
 /**

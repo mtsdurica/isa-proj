@@ -1,6 +1,6 @@
 CXX				:= g++
 RM				:= rm -rf
-CXXFLAGS		:= -std=c++20 -Werror -Wall -Wpedantic
+CXXFLAGS		:= -std=c++20 -Werror -Wall -Wpedantic -lssl -lcrypto
 TARGET			:= imapcl
 TESTS_TARGET 	:= tests
 BUILD			:= ./build

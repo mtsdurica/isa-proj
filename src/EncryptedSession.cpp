@@ -1,66 +1,32 @@
-/**
- * @file Session.cpp
- * @author Matúš Ďurica (xduric06@stud.fit.vutbr.cz)
- * @brief Contains definitions of Session class methods
- * @version 0.1
- * @date 2024-10-08
- *
- * @copyright Copyright (c) 2024
- *
- */
-#include <cstdlib>
+#include "../include/EncryptedSession.h"
+
 #include <filesystem>
-#include <fstream>
-#include <regex>
+#include <openssl/evp.h>
+#include <openssl/ssl.h>
 #include <string>
-#include <sys/socket.h>
 
 #include "../include/Message.h"
-#include "../include/Session.h"
 
-Session::Session(const std::string &username, const std::string &password, const std::string &outDirectoryPath,
-                 const std::string &mailBox)
-    : SocketDescriptor(-1), Server(nullptr), Username(username), Password(password), Buffer(std::string("", 1024)),
-      FullResponse(""), OutDirectoryPath(outDirectoryPath), MailBox(mailBox), CurrentTagNumber(1)
+EncryptedSession::EncryptedSession(const std::string &username, const std::string &password,
+                                   const std::string &outDirectoryPath, const std::string &mailBox,
+                                   const std::string &certificateFile, const std::string &certificateFileDirectoryPath)
+    : Session(username, password, outDirectoryPath, mailBox), CertificateFile(certificateFile),
+      CertificateFileDirectoryPath(certificateFileDirectoryPath)
 {
 }
 
-Session::~Session()
+EncryptedSession::~EncryptedSession()
 {
-    if (this->Server != nullptr)
-        freeaddrinfo(this->Server);
-    if (this->SocketDescriptor > 0)
-    {
-        shutdown(this->SocketDescriptor, SHUT_RDWR);
-        close(this->SocketDescriptor);
-    }
+    SSL_shutdown(this->SecureConnection);
+    SSL_free(this->SecureConnection);
+    SSL_CTX_free(this->SecureContext);
 }
 
-Utils::ReturnCodes Session::GetHostAddressInfo(const std::string &serverAddress, const std::string &port)
-{
-    struct addrinfo hints = {};
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    if (getaddrinfo(serverAddress.c_str(), port.c_str(), &hints, &(this->Server)) != 0)
-        return Utils::PrintError(Utils::SERVER_BAD_HOST, "Bad host");
-    return Utils::IMAPCL_SUCCESS;
-}
-
-Utils::ReturnCodes Session::CreateSocket()
-{
-    if ((this->SocketDescriptor =
-             socket(this->Server->ai_family, this->Server->ai_socktype, this->Server->ai_protocol)) <= 0)
-        return Utils::PrintError(Utils::SOCKET_CREATING, "Error creating socket");
-    std::cerr << "SOCKET CREATED!" << "\n";
-    return Utils::IMAPCL_SUCCESS;
-}
-
-void Session::ReceiveUntaggedResponse()
+void EncryptedSession::ReceiveUntaggedResponse()
 {
     while (true)
     {
-        unsigned long int received = recv(this->SocketDescriptor, this->Buffer.data(), BUFFER_SIZE, 0);
+        unsigned long int received = SSL_read(this->SecureConnection, this->Buffer.data(), BUFFER_SIZE);
         if (received != 0)
         {
             this->FullResponse += this->Buffer.substr(0, received);
@@ -72,11 +38,11 @@ void Session::ReceiveUntaggedResponse()
     this->Buffer = std::string("", BUFFER_SIZE);
 }
 
-void Session::ReceiveTaggedResponse()
+void EncryptedSession::ReceiveTaggedResponse()
 {
     while (true)
     {
-        unsigned long int received = recv(this->SocketDescriptor, this->Buffer.data(), BUFFER_SIZE, 0);
+        unsigned long int received = SSL_read(this->SecureConnection, this->Buffer.data(), BUFFER_SIZE);
         if (received != 0)
         {
             this->FullResponse += this->Buffer.substr(0, received);
@@ -88,28 +54,46 @@ void Session::ReceiveTaggedResponse()
     this->Buffer = std::string("", BUFFER_SIZE);
 }
 
-void Session::SendMessage(const std::string &message)
+Utils::ReturnCodes EncryptedSession::EncryptSocket()
+{
+    // TODO: Error handling
+    SSL_load_error_strings();
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    // Creating SSL context
+    this->SecureContext = SSL_CTX_new(TLS_client_method());
+    // Creating SSL connection from context
+    this->SecureConnection = SSL_new(this->SecureContext);
+    if (!this->SecureConnection)
+        std::cerr << "ERROR creating SSL" << "\n";
+    // Setting BSD socket descriptor into SSL
+    SSL_set_fd(this->SecureConnection, this->SocketDescriptor);
+    // Connecting through SSL
+    if (SSL_connect(this->SecureConnection) <= 0)
+        std::cerr << "DEEZ NUTS" << "\n";
+    return Utils::IMAPCL_SUCCESS;
+}
+
+void EncryptedSession::SendMessage(const std::string &message)
 {
     std::string messageBuffer = "A" + std::to_string(this->CurrentTagNumber) + " ";
     messageBuffer += message + "\n";
-    if (send(this->SocketDescriptor, messageBuffer.c_str(), messageBuffer.length(), 0) == -1)
+    if (SSL_write(this->SecureConnection, messageBuffer.c_str(), messageBuffer.length()) == -1)
     {
         // TODO: Error handling
     }
 }
 
-Utils::ReturnCodes Session::Connect()
+Utils::ReturnCodes EncryptedSession::Connect()
 {
     if (connect(this->SocketDescriptor, Server->ai_addr, Server->ai_addrlen) == -1)
         return Utils::PrintError(Utils::SOCKET_CONNECTING, "Connecting to socket failed");
-    this->ReceiveUntaggedResponse();
-    if (Utils::ValidateResponse(this->FullResponse, "\\*\\sOK"))
-        return Utils::PrintError(Utils::INVALID_RESPONSE, "Response is invalid");
+    this->EncryptSocket();
     this->FullResponse = "";
     return Utils::IMAPCL_SUCCESS;
 }
 
-Utils::ReturnCodes Session::Authenticate()
+Utils::ReturnCodes EncryptedSession::Authenticate()
 {
     this->SendMessage("LOGIN " + this->Username + " " + this->Password);
     this->ReceiveTaggedResponse();
@@ -131,7 +115,7 @@ Utils::ReturnCodes Session::Authenticate()
     return Utils::IMAPCL_SUCCESS;
 }
 
-Utils::ReturnCodes Session::ValidateMailbox()
+Utils::ReturnCodes EncryptedSession::ValidateMailbox()
 {
     std::regex validityRegex("UIDVALIDITY\\s([0-9]+)");
     std::smatch validityMatch;
@@ -162,7 +146,7 @@ Utils::ReturnCodes Session::ValidateMailbox()
     return Utils::IMAPCL_SUCCESS;
 }
 
-Utils::ReturnCodes Session::SelectMailbox()
+Utils::ReturnCodes EncryptedSession::SelectMailbox()
 {
     // Selecting mailbox
     this->SendMessage("SELECT " + this->MailBox);
@@ -180,7 +164,7 @@ Utils::ReturnCodes Session::SelectMailbox()
     return Utils::IMAPCL_SUCCESS;
 }
 
-std::vector<std::string> Session::SearchMailbox(const std::string &searchKey)
+std::vector<std::string> EncryptedSession::SearchMailbox(const std::string &searchKey)
 {
     // Searching for all mail in selected mailbox
     this->SendMessage("UID SEARCH " + searchKey);
@@ -202,7 +186,7 @@ std::vector<std::string> Session::SearchMailbox(const std::string &searchKey)
     return messageUIDs;
 }
 
-Utils::ReturnCodes Session::FetchAllMail()
+Utils::ReturnCodes EncryptedSession::FetchAllMail()
 {
     Utils::ReturnCodes returnCode;
     if ((returnCode = this->SelectMailbox()))
@@ -250,7 +234,7 @@ Utils::ReturnCodes Session::FetchAllMail()
     return Utils::IMAPCL_SUCCESS;
 }
 
-Utils::ReturnCodes Session::Logout()
+Utils::ReturnCodes EncryptedSession::Logout()
 {
     this->SendMessage("LOGOUT");
     this->ReceiveTaggedResponse();
@@ -259,9 +243,4 @@ Utils::ReturnCodes Session::Logout()
     this->FullResponse = "";
     this->CurrentTagNumber++;
     return Utils::IMAPCL_SUCCESS;
-}
-
-int Session::GetSocketDescriptor()
-{
-    return this->SocketDescriptor;
 }
