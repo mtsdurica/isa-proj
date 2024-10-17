@@ -21,7 +21,8 @@
 Session::Session(const std::string &username, const std::string &password, const std::string &outDirectoryPath,
                  const std::string &mailBox)
     : SocketDescriptor(-1), Server(nullptr), Username(username), Password(password), Buffer(std::string("", 1024)),
-      FullResponse(""), OutDirectoryPath(outDirectoryPath), MailBox(mailBox), CurrentTagNumber(1)
+      FullResponse(""), OutDirectoryPath(outDirectoryPath), MailBox(mailBox), CurrentTagNumber(1),
+      ReturnCode(Utils::IMAPCL_SUCCESS)
 {
 }
 
@@ -52,7 +53,6 @@ Utils::ReturnCodes Session::CreateSocket()
     if ((this->SocketDescriptor =
              socket(this->Server->ai_family, this->Server->ai_socktype, this->Server->ai_protocol)) <= 0)
         return Utils::PrintError(Utils::SOCKET_CREATING, "Error creating socket");
-    std::cerr << "SOCKET CREATED!" << "\n";
     return Utils::IMAPCL_SUCCESS;
 }
 
@@ -140,6 +140,7 @@ Utils::ReturnCodes Session::ValidateMailbox()
     struct stat buffer;
     if (stat(validityFile.c_str(), &buffer) != 0)
     {
+        std::cerr << "ooga" << validityMatch[1] << " " << validityFile << "\n";
         std::ofstream file(validityFile);
         file << validityMatch[1] << std::endl;
         file.close();
@@ -152,9 +153,16 @@ Utils::ReturnCodes Session::ValidateMailbox()
             return Utils::PrintError(Utils::VALIDITY_FILE_OPEN, "Could not open validity file");
         while (std::getline(file, line))
         {
-            if (!line.compare(validityMatch[1]))
+            if (line.compare(validityMatch[1]))
             {
-                this->MailBoxValidated = true;
+                // Clearing out local mail directory, because UIDValidity file needs to be update
+                // and mail will need to be redownloaded
+                for (const auto &entry : std::filesystem::directory_iterator(this->OutDirectoryPath))
+                    std::filesystem::remove_all(entry.path());
+                // Updating UIDValidity file to a new value
+                std::ofstream file(validityFile);
+                file << validityMatch[1] << std::endl;
+                file.close();
                 break;
             }
         }
@@ -168,12 +176,11 @@ Utils::ReturnCodes Session::SelectMailbox()
     this->SendMessage("SELECT " + this->MailBox);
     this->ReceiveTaggedResponse();
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
-        return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Cant access mailbox");
+        return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Can not access mailbox");
 
     // Checking UIDValidity of the mailbox
-    Utils::ReturnCodes returnCode;
-    if ((returnCode = this->ValidateMailbox()))
-        return returnCode;
+    if ((this->ReturnCode = this->ValidateMailbox()))
+        return this->ReturnCode;
 
     this->FullResponse = "";
     this->CurrentTagNumber++;
@@ -202,25 +209,30 @@ std::vector<std::string> Session::SearchMailbox(const std::string &searchKey)
     return messageUIDs;
 }
 
-Utils::ReturnCodes Session::FetchAllMail()
+std::vector<std::string> Session::SearchLocalMailDirectory()
 {
-    Utils::ReturnCodes returnCode;
-    if ((returnCode = this->SelectMailbox()))
-        return returnCode;
-    std::vector<std::string> messageUIDs = this->SearchMailbox("ALL");
     std::vector<std::string> localMessagesUIDs;
     for (const auto &entry : std::filesystem::directory_iterator(this->OutDirectoryPath))
     {
         // std::cerr << "MAIL FILE: " << entry.path() << std::endl;
         std::string fileName = entry.path();
-        std::regex messageUIDRegex("([0-9])(.+)");
+        std::regex messageUIDRegex("([0-9]+)(.+)");
         std::smatch messageUIDMatch;
         if (std::regex_search(fileName, messageUIDMatch, messageUIDRegex))
             localMessagesUIDs.push_back(messageUIDMatch[1]);
     }
+    return localMessagesUIDs;
+}
+
+Utils::ReturnCodes Session::FetchAllMail()
+{
+    if ((this->ReturnCode = this->SelectMailbox()))
+        return this->ReturnCode;
+    std::vector<std::string> messageUIDs = this->SearchMailbox("ALL");
+    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectory();
     // Retrieving sizes of mail
     // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
-    int numOfDownloaded = 0;
+    unsigned int numOfDownloaded = 0;
     for (auto x : messageUIDs)
     {
         bool mailNotToBeDownloaded = false;
@@ -246,7 +258,8 @@ Utils::ReturnCodes Session::FetchAllMail()
         this->CurrentTagNumber++;
         numOfDownloaded++;
     }
-    std::cout << "Downloaded: " << numOfDownloaded << " file(s)" << "\n";
+    std::cout << "Downloaded: " << numOfDownloaded << " file(s)"
+              << "\n";
     return Utils::IMAPCL_SUCCESS;
 }
 
@@ -259,9 +272,4 @@ Utils::ReturnCodes Session::Logout()
     this->FullResponse = "";
     this->CurrentTagNumber++;
     return Utils::IMAPCL_SUCCESS;
-}
-
-int Session::GetSocketDescriptor()
-{
-    return this->SocketDescriptor;
 }

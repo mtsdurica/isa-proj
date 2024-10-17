@@ -39,8 +39,9 @@ int main(int argc, char **argv)
             return Utils::SERVER_BAD_HOST;
         if (session.CreateSocket())
             return Utils::SOCKET_CREATING;
-        if (session.Connect())
-            return Utils::SOCKET_CONNECTING;
+        returnCode = session.Connect();
+        if (returnCode)
+            return returnCode;
         if (session.Authenticate())
             return Utils::AUTH_FILE_OPEN;
         if (session.FetchAllMail())

@@ -33,7 +33,7 @@ class Session
     std::string OutDirectoryPath;
     std::string MailBox;
     int CurrentTagNumber;
-    bool MailBoxValidated;
+    Utils::ReturnCodes ReturnCode;
     /**
      * @brief Validate UIDValidity of a mailbox.
      * If validity file does not exist, it is created and the UIDValidity is written to it. If it exists and UIDValidity
@@ -50,6 +50,7 @@ class Session
      */
     Utils::ReturnCodes SelectMailbox();
     std::vector<std::string> SearchMailbox(const std::string &searchKey);
+    std::vector<std::string> SearchLocalMailDirectory();
 
   public:
     Session(const std::string &username, const std::string &password, const std::string &outDirectoryPath,
@@ -107,10 +108,4 @@ class Session
      * @return IMAPCL_SUCCESS if nothing failed
      */
     Utils::ReturnCodes Logout();
-    /**
-     * @brief Get socket descriptor
-     *
-     * @return Socket descriptor
-     */
-    int GetSocketDescriptor();
 };

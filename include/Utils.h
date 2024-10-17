@@ -21,7 +21,6 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 
-#define DEBUG
 #define BUFFER_SIZE 1024
 
 namespace Utils
@@ -45,7 +44,12 @@ typedef enum ReturnCodes
     OUT_DIR_NONEXISTENT,
     VALIDITY_FILE_OPEN,
     CANT_ACCESS_MAILBOX,
-    INVALID_RESPONSE
+    SOCKET_WRITING,
+    INVALID_RESPONSE,
+    SSL_CONTEXT_CREATE,
+    SSL_CONNECTION_CREATE,
+    SSL_SET_DESCRIPTOR,
+    SSL_HANDSHAKE_FAILED
 } ReturnCodes;
 
 typedef struct Arguments
@@ -66,7 +70,7 @@ typedef struct Arguments
     Arguments()
         : Port("143"), Encrypted(false), CertificateFile(""), CertificateFileDirectoryPath("/etc/ssl/certs/"),
           OnlyNewMails(false), OnlyMailHeaders(false), AuthFilePath(""), MailBox("INBOX"), OutDirectoryPath(""),
-          Username(""), Password("") {};
+          Username(""), Password(""){};
 } Arguments;
 
 /**

@@ -16,9 +16,8 @@ class EncryptedSession final : public Session
     /**
      *
      */
-    void SendMessage(const std::string &message);
+    Utils::ReturnCodes SendMessage(const std::string &message);
     Utils::ReturnCodes EncryptSocket();
-    Utils::ReturnCodes ValidateMailbox();
     Utils::ReturnCodes SelectMailbox();
     std::vector<std::string> SearchMailbox(const std::string &searchKey);
 

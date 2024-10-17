@@ -54,6 +54,9 @@ void Message::ParseMessageBody()
 
 void Message::DumpToFile(const std::string &outDirectoryPath)
 {
+#ifdef DEBUG
+    std::cerr << this->MessageBody.length() << "\n";
+#endif // DEBUG
     std::ofstream file(outDirectoryPath + "/" + this->FileName);
     file << this->MessageBody;
     file.close();

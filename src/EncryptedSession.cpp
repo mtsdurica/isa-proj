@@ -1,6 +1,5 @@
 #include "../include/EncryptedSession.h"
 
-#include <filesystem>
 #include <openssl/evp.h>
 #include <openssl/ssl.h>
 #include <string>
@@ -56,46 +55,47 @@ void EncryptedSession::ReceiveTaggedResponse()
 
 Utils::ReturnCodes EncryptedSession::EncryptSocket()
 {
-    // TODO: Error handling
     SSL_load_error_strings();
     SSL_library_init();
     OpenSSL_add_all_algorithms();
     // Creating SSL context
-    this->SecureContext = SSL_CTX_new(TLS_client_method());
+    if ((this->SecureContext = SSL_CTX_new(TLS_client_method())) == nullptr)
+        return Utils::PrintError(Utils::SSL_CONTEXT_CREATE, "Failed creating SSL context");
     // Creating SSL connection from context
-    this->SecureConnection = SSL_new(this->SecureContext);
-    if (!this->SecureConnection)
-        std::cerr << "ERROR creating SSL" << "\n";
+    if ((this->SecureConnection = SSL_new(this->SecureContext)) == nullptr)
+        return Utils::PrintError(Utils::SSL_CONNECTION_CREATE, "Failed creating SSL connection");
     // Setting BSD socket descriptor into SSL
-    SSL_set_fd(this->SecureConnection, this->SocketDescriptor);
+    if (!SSL_set_fd(this->SecureConnection, this->SocketDescriptor))
+        return Utils::PrintError(Utils::SSL_SET_DESCRIPTOR, "Failed setting socket descriptor to SSL");
     // Connecting through SSL
     if (SSL_connect(this->SecureConnection) <= 0)
-        std::cerr << "DEEZ NUTS" << "\n";
+        return Utils::PrintError(Utils::SSL_HANDSHAKE_FAILED, "Failed SSL handshake");
     return Utils::IMAPCL_SUCCESS;
 }
 
-void EncryptedSession::SendMessage(const std::string &message)
+Utils::ReturnCodes EncryptedSession::SendMessage(const std::string &message)
 {
     std::string messageBuffer = "A" + std::to_string(this->CurrentTagNumber) + " ";
     messageBuffer += message + "\n";
-    if (SSL_write(this->SecureConnection, messageBuffer.c_str(), messageBuffer.length()) == -1)
-    {
-        // TODO: Error handling
-    }
+    if (SSL_write(this->SecureConnection, messageBuffer.c_str(), messageBuffer.length()) <= 0)
+        return Utils::PrintError(Utils::SOCKET_WRITING, "Failed writing to a socket");
+    return Utils::IMAPCL_SUCCESS;
 }
 
 Utils::ReturnCodes EncryptedSession::Connect()
 {
     if (connect(this->SocketDescriptor, Server->ai_addr, Server->ai_addrlen) == -1)
         return Utils::PrintError(Utils::SOCKET_CONNECTING, "Connecting to socket failed");
-    this->EncryptSocket();
+    if ((this->ReturnCode = this->EncryptSocket()))
+        return this->ReturnCode;
     this->FullResponse = "";
     return Utils::IMAPCL_SUCCESS;
 }
 
 Utils::ReturnCodes EncryptedSession::Authenticate()
 {
-    this->SendMessage("LOGIN " + this->Username + " " + this->Password);
+    if ((this->ReturnCode = this->SendMessage("LOGIN " + this->Username + " " + this->Password)))
+        return this->ReturnCode;
     this->ReceiveTaggedResponse();
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sNO"))
     {
@@ -115,49 +115,49 @@ Utils::ReturnCodes EncryptedSession::Authenticate()
     return Utils::IMAPCL_SUCCESS;
 }
 
-Utils::ReturnCodes EncryptedSession::ValidateMailbox()
-{
-    std::regex validityRegex("UIDVALIDITY\\s([0-9]+)");
-    std::smatch validityMatch;
-    std::regex_search(this->FullResponse, validityMatch, validityRegex);
-    std::string validityFile = this->OutDirectoryPath + "/." + this->MailBox + "_validity";
-    struct stat buffer;
-    if (stat(validityFile.c_str(), &buffer) != 0)
-    {
-        std::ofstream file(validityFile);
-        file << validityMatch[1] << std::endl;
-        file.close();
-    }
-    else
-    {
-        std::ifstream file(validityFile);
-        std::string line;
-        if (!file.is_open())
-            return Utils::PrintError(Utils::VALIDITY_FILE_OPEN, "Could not open validity file");
-        while (std::getline(file, line))
-        {
-            if (!line.compare(validityMatch[1]))
-            {
-                this->MailBoxValidated = true;
-                break;
-            }
-        }
-    }
-    return Utils::IMAPCL_SUCCESS;
-}
+/*Utils::ReturnCodes EncryptedSession::ValidateMailbox()*/
+/*{*/
+/*    std::regex validityRegex("UIDVALIDITY\\s([0-9]+)");*/
+/*    std::smatch validityMatch;*/
+/*    std::regex_search(this->FullResponse, validityMatch, validityRegex);*/
+/*    std::string validityFile = this->OutDirectoryPath + "/." + this->MailBox + "_validity";*/
+/*    struct stat buffer;*/
+/*    if (stat(validityFile.c_str(), &buffer) != 0)*/
+/*    {*/
+/*        std::ofstream file(validityFile);*/
+/*        file << validityMatch[1] << std::endl;*/
+/*        file.close();*/
+/*    }*/
+/*    else*/
+/*    {*/
+/*        std::ifstream file(validityFile);*/
+/*        std::string line;*/
+/*        if (!file.is_open())*/
+/*            return Utils::PrintError(Utils::VALIDITY_FILE_OPEN, "Could not open validity file");*/
+/*        while (std::getline(file, line))*/
+/*        {*/
+/*            if (!line.compare(validityMatch[1]))*/
+/*            {*/
+/*                this->MailBoxValidated = true;*/
+/*                break;*/
+/*            }*/
+/*        }*/
+/*    }*/
+/*    return Utils::IMAPCL_SUCCESS;*/
+/*}*/
 
 Utils::ReturnCodes EncryptedSession::SelectMailbox()
 {
     // Selecting mailbox
-    this->SendMessage("SELECT " + this->MailBox);
+    if ((this->ReturnCode = this->SendMessage("SELECT " + this->MailBox)))
+        return this->ReturnCode;
     this->ReceiveTaggedResponse();
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
         return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Cant access mailbox");
 
     // Checking UIDValidity of the mailbox
-    Utils::ReturnCodes returnCode;
-    if ((returnCode = this->ValidateMailbox()))
-        return returnCode;
+    if ((this->ReturnCode = this->ValidateMailbox()))
+        return ReturnCode;
 
     this->FullResponse = "";
     this->CurrentTagNumber++;
@@ -188,20 +188,10 @@ std::vector<std::string> EncryptedSession::SearchMailbox(const std::string &sear
 
 Utils::ReturnCodes EncryptedSession::FetchAllMail()
 {
-    Utils::ReturnCodes returnCode;
-    if ((returnCode = this->SelectMailbox()))
-        return returnCode;
+    if ((this->ReturnCode = this->SelectMailbox()))
+        return this->ReturnCode;
     std::vector<std::string> messageUIDs = this->SearchMailbox("ALL");
-    std::vector<std::string> localMessagesUIDs;
-    for (const auto &entry : std::filesystem::directory_iterator(this->OutDirectoryPath))
-    {
-        // std::cerr << "MAIL FILE: " << entry.path() << std::endl;
-        std::string fileName = entry.path();
-        std::regex messageUIDRegex("([0-9])(.+)");
-        std::smatch messageUIDMatch;
-        if (std::regex_search(fileName, messageUIDMatch, messageUIDRegex))
-            localMessagesUIDs.push_back(messageUIDMatch[1]);
-    }
+    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectory();
     // Retrieving sizes of mail
     // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
     int numOfDownloaded = 0;
@@ -217,6 +207,7 @@ Utils::ReturnCodes EncryptedSession::FetchAllMail()
         this->SendMessage("UID FETCH " + x + "RFC822.SIZE");
         this->ReceiveTaggedResponse();
         Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK");
+        std::cerr << this->FullResponse;
         this->FullResponse = "";
         this->CurrentTagNumber++;
         // Fetching mail
@@ -230,7 +221,8 @@ Utils::ReturnCodes EncryptedSession::FetchAllMail()
         this->CurrentTagNumber++;
         numOfDownloaded++;
     }
-    std::cout << "Downloaded: " << numOfDownloaded << " file(s)" << "\n";
+    std::cout << "Downloaded: " << numOfDownloaded << " file(s)"
+              << "\n";
     return Utils::IMAPCL_SUCCESS;
 }
 

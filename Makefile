@@ -1,6 +1,7 @@
 CXX				:= g++
 RM				:= rm -rf
-CXXFLAGS		:= -std=c++20 -Werror -Wall -Wpedantic -lssl -lcrypto
+CXXFLAGS		:= -std=c++20 -Werror -Wall -Wpedantic 
+SSLFLAGS		:= -lssl -lcrypto
 TARGET			:= imapcl
 TESTS_TARGET 	:= tests
 BUILD			:= ./build
@@ -10,17 +11,20 @@ TESTS_DIR		:= ./tests
 SRC_FILES		:= $(wildcard src/*.cpp)			
 OBJECTS 		:= $(SRC_FILES:%.cpp=$(OBJ_DIR)/%.o)
 
-.PHONY: all test clean build
+.PHONY: all test clean build debug
 
 all: build ./$(TARGET)
 
+debug: DEBUG:=-DDEBUG
+debug: build ./$(TARGET)
+
 $(OBJ_DIR)/%.o: %.cpp $(INCLUDE_DIR)/*.h 
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(DEBUG) -c $< -o $@ $(SSLFLAGS)
 
 ./$(TARGET): $(OBJECTS)
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SSLFLAGS)
 
 build:
 	@mkdir -p $(OBJ_DIR)
