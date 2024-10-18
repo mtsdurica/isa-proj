@@ -18,13 +18,13 @@ class EncryptedSession final : public Session
      */
     Utils::ReturnCodes SendMessage(const std::string &message);
     Utils::ReturnCodes EncryptSocket();
-    Utils::ReturnCodes SelectMailbox();
+    Utils::ReturnCodes SelectMailbox(Utils::TypeOfFetch typeOfFetch);
     std::vector<std::string> SearchMailbox(const std::string &searchKey);
 
   public:
-    EncryptedSession(const std::string &username, const std::string &password, const std::string &outDirectoryPath,
-                     const std::string &mailBox, const std::string &certificateFile,
-                     const std::string &certificateFileDirectoryPath);
+    EncryptedSession(const std::string &serverHostname, const std::string &port, const std::string &username,
+                     const std::string &password, const std::string &outDirectoryPath, const std::string &mailBox,
+                     const std::string &certificateFile, const std::string &certificateFileDirectoryPath);
     ~EncryptedSession();
     /**
      *
@@ -53,6 +53,7 @@ class EncryptedSession final : public Session
      * VALIDITY_FILE_OPEN if the UIDValidity file can not be opened
      */
     Utils::ReturnCodes FetchAllMail();
+    Utils::ReturnCodes FetchAllHeaders();
     /**
      * @brief Logout user from session
      *

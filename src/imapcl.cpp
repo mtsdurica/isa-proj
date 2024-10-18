@@ -33,9 +33,10 @@ int main(int argc, char **argv)
         return returnCode;
     if (arguments.Encrypted)
     {
-        EncryptedSession session(arguments.Username, arguments.Password, arguments.OutDirectoryPath, arguments.MailBox,
-                                 arguments.CertificateFile, arguments.CertificateFileDirectoryPath);
-        if (session.GetHostAddressInfo(arguments.ServerAddress, arguments.Port))
+        EncryptedSession session(arguments.ServerAddress, arguments.Port, arguments.Username, arguments.Password,
+                                 arguments.OutDirectoryPath, arguments.MailBox, arguments.CertificateFile,
+                                 arguments.CertificateFileDirectoryPath);
+        if (session.GetHostAddressInfo())
             return Utils::SERVER_BAD_HOST;
         if (session.CreateSocket())
             return Utils::SOCKET_CREATING;
@@ -51,9 +52,10 @@ int main(int argc, char **argv)
     }
     else
     {
-        Session session(arguments.Username, arguments.Password, arguments.OutDirectoryPath, arguments.MailBox);
+        Session session(arguments.ServerAddress, arguments.Port, arguments.Username, arguments.Password,
+                        arguments.OutDirectoryPath, arguments.MailBox);
 
-        if (session.GetHostAddressInfo(arguments.ServerAddress, arguments.Port))
+        if (session.GetHostAddressInfo())
             return Utils::SERVER_BAD_HOST;
         if (session.CreateSocket())
             return Utils::SOCKET_CREATING;

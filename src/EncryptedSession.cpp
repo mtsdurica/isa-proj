@@ -6,10 +6,11 @@
 
 #include "../include/Message.h"
 
-EncryptedSession::EncryptedSession(const std::string &username, const std::string &password,
+EncryptedSession::EncryptedSession(const std::string &serverHostname, const std::string &port,
+                                   const std::string &username, const std::string &password,
                                    const std::string &outDirectoryPath, const std::string &mailBox,
                                    const std::string &certificateFile, const std::string &certificateFileDirectoryPath)
-    : Session(username, password, outDirectoryPath, mailBox), CertificateFile(certificateFile),
+    : Session(serverHostname, port, username, password, outDirectoryPath, mailBox), CertificateFile(certificateFile),
       CertificateFileDirectoryPath(certificateFileDirectoryPath)
 {
 }
@@ -115,38 +116,7 @@ Utils::ReturnCodes EncryptedSession::Authenticate()
     return Utils::IMAPCL_SUCCESS;
 }
 
-/*Utils::ReturnCodes EncryptedSession::ValidateMailbox()*/
-/*{*/
-/*    std::regex validityRegex("UIDVALIDITY\\s([0-9]+)");*/
-/*    std::smatch validityMatch;*/
-/*    std::regex_search(this->FullResponse, validityMatch, validityRegex);*/
-/*    std::string validityFile = this->OutDirectoryPath + "/." + this->MailBox + "_validity";*/
-/*    struct stat buffer;*/
-/*    if (stat(validityFile.c_str(), &buffer) != 0)*/
-/*    {*/
-/*        std::ofstream file(validityFile);*/
-/*        file << validityMatch[1] << std::endl;*/
-/*        file.close();*/
-/*    }*/
-/*    else*/
-/*    {*/
-/*        std::ifstream file(validityFile);*/
-/*        std::string line;*/
-/*        if (!file.is_open())*/
-/*            return Utils::PrintError(Utils::VALIDITY_FILE_OPEN, "Could not open validity file");*/
-/*        while (std::getline(file, line))*/
-/*        {*/
-/*            if (!line.compare(validityMatch[1]))*/
-/*            {*/
-/*                this->MailBoxValidated = true;*/
-/*                break;*/
-/*            }*/
-/*        }*/
-/*    }*/
-/*    return Utils::IMAPCL_SUCCESS;*/
-/*}*/
-
-Utils::ReturnCodes EncryptedSession::SelectMailbox()
+Utils::ReturnCodes EncryptedSession::SelectMailbox(Utils::TypeOfFetch typeOfFetch)
 {
     // Selecting mailbox
     if ((this->ReturnCode = this->SendMessage("SELECT " + this->MailBox)))
@@ -156,7 +126,7 @@ Utils::ReturnCodes EncryptedSession::SelectMailbox()
         return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Cant access mailbox");
 
     // Checking UIDValidity of the mailbox
-    if ((this->ReturnCode = this->ValidateMailbox()))
+    if ((this->ReturnCode = this->ValidateMailbox(typeOfFetch)))
         return ReturnCode;
 
     this->FullResponse = "";
@@ -188,7 +158,7 @@ std::vector<std::string> EncryptedSession::SearchMailbox(const std::string &sear
 
 Utils::ReturnCodes EncryptedSession::FetchAllMail()
 {
-    if ((this->ReturnCode = this->SelectMailbox()))
+    if ((this->ReturnCode = this->SelectMailbox(Utils::FETCH_ALL)))
         return this->ReturnCode;
     std::vector<std::string> messageUIDs = this->SearchMailbox("ALL");
     std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectory();
@@ -207,14 +177,52 @@ Utils::ReturnCodes EncryptedSession::FetchAllMail()
         this->SendMessage("UID FETCH " + x + "RFC822.SIZE");
         this->ReceiveTaggedResponse();
         Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK");
-        std::cerr << this->FullResponse;
         this->FullResponse = "";
         this->CurrentTagNumber++;
         // Fetching mail
         this->SendMessage("UID FETCH " + x + " BODY[]");
         this->ReceiveTaggedResponse();
         Message message(x, this->FullResponse);
-        message.ParseFileName();
+        message.ParseFileName(this->ServerHostname, this->MailBox);
+        message.ParseMessageBody();
+        message.DumpToFile(this->OutDirectoryPath);
+        this->FullResponse = "";
+        this->CurrentTagNumber++;
+        numOfDownloaded++;
+    }
+    std::cout << "Downloaded: " << numOfDownloaded << " file(s)"
+              << "\n";
+    return Utils::IMAPCL_SUCCESS;
+}
+
+Utils::ReturnCodes EncryptedSession::FetchAllHeaders()
+{
+    if ((this->ReturnCode = this->SelectMailbox(Utils::FETCH_HEADERS)))
+        return this->ReturnCode;
+    std::vector<std::string> messageUIDs = this->SearchMailbox("ALL");
+    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectory();
+    // Retrieving sizes of mail
+    // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
+    int numOfDownloaded = 0;
+    for (auto x : messageUIDs)
+    {
+        bool mailNotToBeDownloaded = false;
+        for (auto m : localMessagesUIDs)
+            if (!x.compare(m))
+                mailNotToBeDownloaded = true;
+        if (mailNotToBeDownloaded)
+            continue;
+        // Retrieving size of each message
+        this->SendMessage("UID FETCH " + x + "RFC822.SIZE");
+        this->ReceiveTaggedResponse();
+        Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK");
+        this->FullResponse = "";
+        this->CurrentTagNumber++;
+        // Fetching mail
+        this->SendMessage("UID FETCH " + x + " BODY[]");
+        this->ReceiveTaggedResponse();
+        Message message(x, this->FullResponse);
+        message.ParseFileName(this->ServerHostname, this->MailBox);
         message.ParseMessageBody();
         message.DumpToFile(this->OutDirectoryPath);
         this->FullResponse = "";

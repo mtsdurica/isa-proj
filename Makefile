@@ -15,12 +15,9 @@ OBJECTS 		:= $(SRC_FILES:%.cpp=$(OBJ_DIR)/%.o)
 
 all: build ./$(TARGET)
 
-debug: DEBUG:=-DDEBUG
-debug: build ./$(TARGET)
-
 $(OBJ_DIR)/%.o: %.cpp $(INCLUDE_DIR)/*.h 
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) $(DEBUG) -c $< -o $@ $(SSLFLAGS)
+	$(CXX) $(CXXFLAGS) -c $< -o $@ $(SSLFLAGS)
 
 ./$(TARGET): $(OBJECTS)
 	@mkdir -p $(@D)

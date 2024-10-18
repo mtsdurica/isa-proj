@@ -20,12 +20,13 @@
 #include <unistd.h>
 
 #include "../include/Utils.h"
-
 class Session
 {
   protected:
     int SocketDescriptor;    // Socket descriptor
     struct addrinfo *Server; // Structure containing host information
+    std::string ServerHostname;
+    std::string Port;
     std::string Username;
     std::string Password;
     std::string Buffer;
@@ -41,20 +42,20 @@ class Session
      *
      * @return IMAPCL_SUCCESS if nothing failed, otherwise VALIDITY_FILE_OPEN
      */
-    Utils::ReturnCodes ValidateMailbox();
+    Utils::ReturnCodes ValidateMailbox(Utils::TypeOfFetch typeOfFetch);
     /**
      * @brief Select mailbox from which to fetch mail.
      *
      * @return IMAPCL_SUCCESS if nothing failed, CANT_ACCESS_MAILBOX if the mailbox can not be accessed,
      * VALIDITY_FILE_OPEN if the UIDValidity file can not be opened
      */
-    Utils::ReturnCodes SelectMailbox();
+    Utils::ReturnCodes SelectMailbox(Utils::TypeOfFetch typeOfFetch);
     std::vector<std::string> SearchMailbox(const std::string &searchKey);
     std::vector<std::string> SearchLocalMailDirectory();
 
   public:
-    Session(const std::string &username, const std::string &password, const std::string &outDirectoryPath,
-            const std::string &mailBox);
+    Session(const std::string &serverHostname, const std::string &port, const std::string &username,
+            const std::string &password, const std::string &outDirectoryPath, const std::string &mailBox);
     ~Session();
     /**
      * @brief Get address info about host
@@ -64,7 +65,7 @@ class Session
      *
      * @return IMAPCL_SUCCESS if nothing failed, otherwise SERVER_BAD_HOST
      */
-    Utils::ReturnCodes GetHostAddressInfo(const std::string &serverAddress, const std::string &port);
+    Utils::ReturnCodes GetHostAddressInfo();
     /**
      * @brief Create communication socket
      *

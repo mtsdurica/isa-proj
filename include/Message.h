@@ -12,7 +12,7 @@ class Message final
   public:
     Message(const std::string &messageUID, const std::string &responseString);
     ~Message();
-    void ParseFileName();
+    void ParseFileName(const std::string &serverHostname, const std::string &mailbox);
     void ParseMessageBody();
     void DumpToFile(const std::string &outDirectoryPath);
 };

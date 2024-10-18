@@ -3,8 +3,6 @@
 #include <fstream>
 #include <regex>
 
-#include "../include/Utils.h"
-
 Message::Message(const std::string &messageUID, const std::string &responseString)
     : MessageUID(messageUID), ResponseString(responseString), FileName(""), MessageBody("")
 {
@@ -12,10 +10,12 @@ Message::Message(const std::string &messageUID, const std::string &responseStrin
 
 Message::~Message() = default;
 
-void Message::ParseFileName()
+void Message::ParseFileName(const std::string &serverHostname, const std::string &mailbox)
 {
 
     this->FileName = this->MessageUID + "_";
+    this->FileName += mailbox + "_";
+    this->FileName += serverHostname + "_";
     std::regex subjectRegex("(Subject:\\s)(.+)");
     std::smatch match;
     std::regex_search(this->ResponseString, match, subjectRegex);
@@ -55,9 +55,6 @@ void Message::ParseMessageBody()
 
 void Message::DumpToFile(const std::string &outDirectoryPath)
 {
-#ifdef DEBUG
-    Utils::PrintDebug("Message body size: " + std::to_string(this->MessageBody.length()));
-#endif // DEBUG
     std::ofstream file(outDirectoryPath + "/" + this->FileName);
     file << this->MessageBody;
     file.close();
