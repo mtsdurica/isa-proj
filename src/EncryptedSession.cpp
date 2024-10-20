@@ -4,6 +4,7 @@
 #include <openssl/ssl.h>
 #include <string>
 
+#include "../include/HeaderMessage.h"
 #include "../include/Message.h"
 
 EncryptedSession::EncryptedSession(const std::string &serverHostname, const std::string &port,
@@ -140,7 +141,10 @@ std::vector<std::string> EncryptedSession::SearchMailbox(const std::string &sear
     this->SendMessage("UID SEARCH " + searchKey);
     this->ReceiveTaggedResponse();
     Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK");
-    std::regex regex("\\b[0-9]+");
+    // Extracting line with UIDs of mail
+    std::regex removeSecondLine("A" + std::to_string(this->CurrentTagNumber) + "[\\s\\S]+");
+    this->FullResponse = std::regex_replace(this->FullResponse, removeSecondLine, "");
+    std::regex regex("[0-9]+");
     std::smatch match;
     std::string::const_iterator start(this->FullResponse.cbegin());
     std::vector<std::string> messageUIDs;
@@ -156,11 +160,15 @@ std::vector<std::string> EncryptedSession::SearchMailbox(const std::string &sear
     return messageUIDs;
 }
 
-Utils::ReturnCodes EncryptedSession::FetchAllMail()
+Utils::ReturnCodes EncryptedSession::FetchMail(const bool newMailOnly)
 {
     if ((this->ReturnCode = this->SelectMailbox(Utils::FETCH_ALL)))
         return this->ReturnCode;
-    std::vector<std::string> messageUIDs = this->SearchMailbox("ALL");
+    std::vector<std::string> messageUIDs;
+    if (newMailOnly)
+        messageUIDs = this->SearchMailbox("UNSEEN");
+    else
+        messageUIDs = this->SearchMailbox("ALL");
     std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectory();
     // Retrieving sizes of mail
     // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
@@ -174,15 +182,19 @@ Utils::ReturnCodes EncryptedSession::FetchAllMail()
         if (mailNotToBeDownloaded)
             continue;
         // Retrieving size of each message
-        this->SendMessage("UID FETCH " + x + "RFC822.SIZE");
+        this->SendMessage("UID FETCH " + x + " RFC822.SIZE");
         this->ReceiveTaggedResponse();
         Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK");
+        std::regex rfcSizeRegex("RFC822.SIZE\\s([0-9]+)");
+        std::smatch rfcSizeMatch;
+        std::regex_search(this->FullResponse, rfcSizeMatch, rfcSizeRegex);
+        std::string rfcSize = rfcSizeMatch[1];
         this->FullResponse = "";
         this->CurrentTagNumber++;
         // Fetching mail
         this->SendMessage("UID FETCH " + x + " BODY[]");
         this->ReceiveTaggedResponse();
-        Message message(x, this->FullResponse);
+        Message message(x, this->FullResponse, stoi(rfcSize));
         message.ParseFileName(this->ServerHostname, this->MailBox);
         message.ParseMessageBody();
         message.DumpToFile(this->OutDirectoryPath);
@@ -190,16 +202,19 @@ Utils::ReturnCodes EncryptedSession::FetchAllMail()
         this->CurrentTagNumber++;
         numOfDownloaded++;
     }
-    std::cout << "Downloaded: " << numOfDownloaded << " file(s)"
-              << "\n";
+    std::cout << "Downloaded: " << numOfDownloaded << " file(s)" << "\n";
     return Utils::IMAPCL_SUCCESS;
 }
 
-Utils::ReturnCodes EncryptedSession::FetchAllHeaders()
+Utils::ReturnCodes EncryptedSession::FetchHeaders(const bool newMailOnly)
 {
     if ((this->ReturnCode = this->SelectMailbox(Utils::FETCH_HEADERS)))
         return this->ReturnCode;
-    std::vector<std::string> messageUIDs = this->SearchMailbox("ALL");
+    std::vector<std::string> messageUIDs;
+    if (newMailOnly)
+        messageUIDs = this->SearchMailbox("UNSEEN");
+    else
+        messageUIDs = this->SearchMailbox("ALL");
     std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectory();
     // Retrieving sizes of mail
     // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
@@ -212,16 +227,10 @@ Utils::ReturnCodes EncryptedSession::FetchAllHeaders()
                 mailNotToBeDownloaded = true;
         if (mailNotToBeDownloaded)
             continue;
-        // Retrieving size of each message
-        this->SendMessage("UID FETCH " + x + "RFC822.SIZE");
-        this->ReceiveTaggedResponse();
-        Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK");
-        this->FullResponse = "";
-        this->CurrentTagNumber++;
         // Fetching mail
-        this->SendMessage("UID FETCH " + x + " BODY[]");
+        this->SendMessage("UID FETCH " + x + " BODY.PEEK[HEADER]");
         this->ReceiveTaggedResponse();
-        Message message(x, this->FullResponse);
+        HeaderMessage message(x, this->FullResponse);
         message.ParseFileName(this->ServerHostname, this->MailBox);
         message.ParseMessageBody();
         message.DumpToFile(this->OutDirectoryPath);

@@ -56,6 +56,7 @@ typedef enum TypeOfFetch
 {
     FETCH_ALL,
     FETCH_HEADERS,
+    FETCH_NEW
 } TypeOfFetch;
 
 typedef struct Arguments
@@ -76,7 +77,7 @@ typedef struct Arguments
     Arguments()
         : Port("143"), Encrypted(false), CertificateFile(""), CertificateFileDirectoryPath("/etc/ssl/certs/"),
           OnlyNewMails(false), OnlyMailHeaders(false), AuthFilePath(""), MailBox("INBOX"), OutDirectoryPath(""),
-          Username(""), Password(""){};
+          Username(""), Password("") {};
 } Arguments;
 
 /**

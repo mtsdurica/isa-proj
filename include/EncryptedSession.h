@@ -52,8 +52,8 @@ class EncryptedSession final : public Session
      * @return IMAPCL_SUCCESS if nothing failed, CANT_ACCESS_MAILBOX if the mailbox can not be accessed,
      * VALIDITY_FILE_OPEN if the UIDValidity file can not be opened
      */
-    Utils::ReturnCodes FetchAllMail();
-    Utils::ReturnCodes FetchAllHeaders();
+    Utils::ReturnCodes FetchMail(const bool newMailOnly);
+    Utils::ReturnCodes FetchHeaders(const bool newMailOnly);
     /**
      * @brief Logout user from session
      *

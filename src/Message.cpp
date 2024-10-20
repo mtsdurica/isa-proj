@@ -1,10 +1,11 @@
 #include "../include/Message.h"
 
 #include <fstream>
+#include <iostream>
 #include <regex>
 
-Message::Message(const std::string &messageUID, const std::string &responseString)
-    : MessageUID(messageUID), ResponseString(responseString), FileName(""), MessageBody("")
+Message::Message(const std::string &messageUID, const std::string &responseString, int rfcSize)
+    : MessageUID(messageUID), ResponseString(responseString), FileName(""), MessageBody(""), RfcSize(rfcSize)
 {
 }
 
@@ -32,25 +33,24 @@ void Message::ParseFileName(const std::string &serverHostname, const std::string
     this->FileName += std::to_string(hasher(match[2]));
     std::replace(this->FileName.begin(), this->FileName.end(), ' ', '_');
     this->FileName += ".eml";
-    /*std::cerr << this->FileName << "\n";*/
 }
 
 void Message::ParseMessageBody()
 {
+    std::cerr << "START\n" << this->ResponseString << "\nEND\n";
     // Removing start and end of the fetch response
-    std::regex startAndEndRegex(
-        "(\\*\\s[0-9]+\\sFETCH\\s*\\(BODY\\[\\]\\s\\{[0-9]+\\}\\s)([\\s\\S]+)(\\sUID\\s[0-9]+\\))");
-    std::smatch match;
-    std::regex_search(this->ResponseString, match, startAndEndRegex);
-    this->MessageBody = match[2];
+    std::regex startAndEndRegex("\\*.+(?=\\s)");
+    this->MessageBody = std::regex_replace(this->ResponseString, startAndEndRegex, "");
+    // this->MessageBody = match[2];
     // Removing remaining part of fetch response (FLAGS)
-    std::regex removeFlagsRegex("([\\s\\S]+)(?=\n)");
-    std::regex_search(this->MessageBody, match, removeFlagsRegex);
-    this->MessageBody = match[0];
+    /*std::regex removeFlagsRegex("([\\s\\S]+)(?=\n)");*/
+    /*std::regex_search(this->MessageBody, match, removeFlagsRegex);*/
+    /*this->MessageBody = match[0];*/
     // Removing newline from the beggining of the message
-    std::regex leadingNewLine("\n([\\s\\S]+)");
-    std::regex_search(this->MessageBody, match, leadingNewLine);
-    this->MessageBody = match[1];
+    /*std::regex leadingNewLine("\n([\\s\\S]+)");*/
+    /*std::regex_search(this->MessageBody, match, leadingNewLine);*/
+    /*this->MessageBody = match[1];*/
+    this->MessageBody = this->MessageBody.substr(2, this->RfcSize);
 }
 
 void Message::DumpToFile(const std::string &outDirectoryPath)

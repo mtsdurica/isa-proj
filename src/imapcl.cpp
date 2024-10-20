@@ -45,8 +45,16 @@ int main(int argc, char **argv)
             return returnCode;
         if (session.Authenticate())
             return Utils::AUTH_FILE_OPEN;
-        if (session.FetchAllMail())
-            return 1;
+        if (arguments.OnlyMailHeaders)
+        {
+            if (session.FetchHeaders(arguments.OnlyNewMails))
+                return 1;
+        }
+        else
+        {
+            if (session.FetchMail(arguments.OnlyNewMails))
+                return 1;
+        }
         if (session.Logout())
             return Utils::INVALID_RESPONSE;
     }
@@ -63,8 +71,16 @@ int main(int argc, char **argv)
             return Utils::SOCKET_CONNECTING;
         if (session.Authenticate())
             return Utils::AUTH_FILE_OPEN;
-        if (session.FetchAllMail())
-            return 1;
+        if (arguments.OnlyMailHeaders)
+        {
+            if (session.FetchHeaders(arguments.OnlyNewMails))
+                return 1;
+        }
+        else
+        {
+            if (session.FetchMail(arguments.OnlyNewMails))
+                return 1;
+        }
         if (session.Logout())
             return Utils::INVALID_RESPONSE;
     }
