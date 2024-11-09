@@ -17,8 +17,21 @@ class EncryptedSession final : public Session
      *
      */
     Utils::ReturnCodes SendMessage(const std::string &message);
+    /**
+     *
+     */
     Utils::ReturnCodes EncryptSocket();
+    /**
+     *
+     */
+    Utils::ReturnCodes LoadCertificates();
+    /**
+     *
+     */
     Utils::ReturnCodes SelectMailbox(Utils::TypeOfFetch typeOfFetch);
+    /**
+     *
+     */
     std::vector<std::string> SearchMailbox(const std::string &searchKey);
 
   public:
@@ -53,6 +66,12 @@ class EncryptedSession final : public Session
      * VALIDITY_FILE_OPEN if the UIDValidity file can not be opened
      */
     Utils::ReturnCodes FetchMail(const bool newMailOnly);
+    /**
+     * @brief Fetch only headers from a mailbox.
+     *
+     * @return IMAPCL_SUCCESS if nothing failed, CANT_ACCESS_MAILBOX if the mailbox can not be accessed,
+     * VALIDITY_FILE_OPEN if the UIDValidity file can not be opened
+     */
     Utils::ReturnCodes FetchHeaders(const bool newMailOnly);
     /**
      * @brief Logout user from session

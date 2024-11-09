@@ -17,13 +17,9 @@ int main(int argc, char **argv)
 {
     /**
      * TODO:
-     * -n
-     * TAG SELECT MAILBOX
-     * TAG SEARCH UNSEEN -> extract UIDs of unseen messages
-     * TAG FETCH one by one from numbers extracted above
      *
-     * -h
-     * -c -C
+     * -n rewrite to \NEW
+     * comments
      *
      * Error handling
      */

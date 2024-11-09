@@ -82,7 +82,7 @@ void Session::ReceiveTaggedResponse()
         {
             this->FullResponse += this->Buffer.substr(0, received);
             // Keep listening on the port until 'current tag' is present
-            if (!Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber)))
+            if (!Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
                 break;
         }
     }
@@ -172,8 +172,6 @@ Utils::ReturnCodes Session::ValidateMailbox(Utils::TypeOfFetch typeOfFetch)
                     std::smatch messageUIDMatch;
                     if (std::regex_search(fileName, messageUIDMatch, messageUIDRegex))
                         std::filesystem::remove_all(entry.path());
-                    // for (auto x : messageUIDMatch)
-                    // std::cerr << x << "\n";
                 }
                 // Updating UIDValidity file to a new value
                 std::ofstream file(validityFile);
@@ -225,7 +223,30 @@ std::vector<std::string> Session::SearchMailbox(const std::string &searchKey)
     return messageUIDs;
 }
 
-std::vector<std::string> Session::SearchLocalMailDirectory()
+std::vector<std::string> Session::SearchLocalMailDirectoryForFullMail()
+{
+    std::vector<std::string> localMessagesUIDs;
+    for (const auto &entry : std::filesystem::directory_iterator(this->OutDirectoryPath))
+    {
+        std::string fileName = entry.path();
+        std::regex messageUIDRegex("([0-9]+)(.+)");
+        std::regex messageHeadersRegex("([0-9]+)(.+)(_h)");
+        std::smatch messageUIDMatch;
+        std::smatch messageHeadersMatch;
+        if (std::regex_search(fileName, messageUIDMatch, messageUIDRegex))
+        {
+            if (std::regex_search(fileName, messageHeadersMatch, messageHeadersRegex))
+            {
+                std::filesystem::remove_all(entry.path());
+            }
+            else
+                localMessagesUIDs.push_back(messageUIDMatch[1]);
+        }
+    }
+    return localMessagesUIDs;
+}
+
+std::vector<std::string> Session::SearchLocalMailDirectoryForAll()
 {
     std::vector<std::string> localMessagesUIDs;
     for (const auto &entry : std::filesystem::directory_iterator(this->OutDirectoryPath))
@@ -248,7 +269,7 @@ Utils::ReturnCodes Session::FetchMail(const bool newMailOnly)
         messageUIDs = this->SearchMailbox("UNSEEN");
     else
         messageUIDs = this->SearchMailbox("ALL");
-    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectory();
+    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectoryForFullMail();
     // Retrieving sizes of mail
     // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
     unsigned int numOfDownloaded = 0;
@@ -273,7 +294,7 @@ Utils::ReturnCodes Session::FetchMail(const bool newMailOnly)
         // Fetching mail
         this->SendMessage("UID FETCH " + x + " BODY[]");
         this->ReceiveTaggedResponse();
-        Message message(x, this->FullResponse, /*stoi(rfcSize)*/ 0);
+        Message message(x, this->FullResponse, stoi(rfcSize));
         message.ParseFileName(this->ServerHostname, this->MailBox);
         message.ParseMessageBody();
         message.DumpToFile(this->OutDirectoryPath);
@@ -281,8 +302,7 @@ Utils::ReturnCodes Session::FetchMail(const bool newMailOnly)
         this->CurrentTagNumber++;
         numOfDownloaded++;
     }
-    std::cout << "Downloaded: " << numOfDownloaded << " file(s)"
-              << "\n";
+    std::cout << "Downloaded: " << numOfDownloaded << " message(s) from " << this->MailBox << "\n";
     return Utils::IMAPCL_SUCCESS;
 }
 
@@ -295,7 +315,7 @@ Utils::ReturnCodes Session::FetchHeaders(const bool newMailOnly)
         messageUIDs = this->SearchMailbox("UNSEEN");
     else
         messageUIDs = this->SearchMailbox("ALL");
-    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectory();
+    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectoryForAll();
     // Retrieving sizes of mail
     // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
     int numOfDownloaded = 0;
@@ -318,8 +338,7 @@ Utils::ReturnCodes Session::FetchHeaders(const bool newMailOnly)
         this->CurrentTagNumber++;
         numOfDownloaded++;
     }
-    std::cout << "Downloaded: " << numOfDownloaded << " file(s)"
-              << "\n";
+    std::cout << "Downloaded: " << numOfDownloaded << " header(s) from " << this->MailBox << "\n";
     return Utils::IMAPCL_SUCCESS;
 }
 Utils::ReturnCodes Session::Logout()

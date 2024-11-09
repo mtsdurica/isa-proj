@@ -48,11 +48,18 @@ void EncryptedSession::ReceiveTaggedResponse()
         {
             this->FullResponse += this->Buffer.substr(0, received);
             // Keep listening on the port until 'current tag' is present
-            if (!Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber)))
+            if (!Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
                 break;
         }
     }
     this->Buffer = std::string("", BUFFER_SIZE);
+}
+
+Utils::ReturnCodes EncryptedSession::LoadCertificates()
+{
+    if (!SSL_CTX_load_verify_dir(this->SecureContext, this->CertificateFileDirectoryPath.c_str()))
+        return Utils::CERTIFICATE_ERROR;
+    return Utils::IMAPCL_SUCCESS;
 }
 
 Utils::ReturnCodes EncryptedSession::EncryptSocket()
@@ -63,6 +70,13 @@ Utils::ReturnCodes EncryptedSession::EncryptSocket()
     // Creating SSL context
     if ((this->SecureContext = SSL_CTX_new(TLS_client_method())) == nullptr)
         return Utils::PrintError(Utils::SSL_CONTEXT_CREATE, "Failed creating SSL context");
+    // Verifying certificate file
+    if (this->CertificateFile != "")
+        if (!SSL_CTX_load_verify_file(this->SecureContext, this->CertificateFile.c_str()))
+            return Utils::PrintError(Utils::CERTIFICATE_ERROR, "Certificate file error");
+    // Verifying certificate directory
+    if (!SSL_CTX_load_verify_dir(this->SecureContext, this->CertificateFileDirectoryPath.c_str()))
+        return Utils::PrintError(Utils::CERTIFICATE_ERROR, "Certificate directory error");
     // Creating SSL connection from context
     if ((this->SecureConnection = SSL_new(this->SecureContext)) == nullptr)
         return Utils::PrintError(Utils::SSL_CONNECTION_CREATE, "Failed creating SSL connection");
@@ -112,8 +126,10 @@ Utils::ReturnCodes EncryptedSession::Authenticate()
             this->CurrentTagNumber++;
             return Utils::IMAPCL_SUCCESS;
         }
-        return Utils::PrintError(Utils::AUTH_INVALID_CREDENTIALS, "Bad credentials");
     }
+    else
+        return Utils::PrintError(Utils::AUTH_INVALID_CREDENTIALS, "Bad credentials");
+
     return Utils::IMAPCL_SUCCESS;
 }
 
@@ -169,9 +185,7 @@ Utils::ReturnCodes EncryptedSession::FetchMail(const bool newMailOnly)
         messageUIDs = this->SearchMailbox("UNSEEN");
     else
         messageUIDs = this->SearchMailbox("ALL");
-    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectory();
-    // Retrieving sizes of mail
-    // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
+    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectoryForFullMail();
     int numOfDownloaded = 0;
     for (auto x : messageUIDs)
     {
@@ -202,7 +216,7 @@ Utils::ReturnCodes EncryptedSession::FetchMail(const bool newMailOnly)
         this->CurrentTagNumber++;
         numOfDownloaded++;
     }
-    std::cout << "Downloaded: " << numOfDownloaded << " file(s)" << "\n";
+    std::cout << "Downloaded: " << numOfDownloaded << " message(s) from " << this->MailBox << "\n";
     return Utils::IMAPCL_SUCCESS;
 }
 
@@ -215,7 +229,7 @@ Utils::ReturnCodes EncryptedSession::FetchHeaders(const bool newMailOnly)
         messageUIDs = this->SearchMailbox("UNSEEN");
     else
         messageUIDs = this->SearchMailbox("ALL");
-    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectory();
+    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectoryForAll();
     // Retrieving sizes of mail
     // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
     int numOfDownloaded = 0;
@@ -238,8 +252,7 @@ Utils::ReturnCodes EncryptedSession::FetchHeaders(const bool newMailOnly)
         this->CurrentTagNumber++;
         numOfDownloaded++;
     }
-    std::cout << "Downloaded: " << numOfDownloaded << " file(s)"
-              << "\n";
+    std::cout << "Downloaded: " << numOfDownloaded << " header(s) from " << this->MailBox << "\n";
     return Utils::IMAPCL_SUCCESS;
 }
 

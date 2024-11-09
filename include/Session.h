@@ -51,7 +51,8 @@ class Session
      */
     Utils::ReturnCodes SelectMailbox(Utils::TypeOfFetch typeOfFetch);
     std::vector<std::string> SearchMailbox(const std::string &searchKey);
-    std::vector<std::string> SearchLocalMailDirectory();
+    std::vector<std::string> SearchLocalMailDirectoryForFullMail();
+    std::vector<std::string> SearchLocalMailDirectoryForAll();
 
   public:
     Session(const std::string &serverHostname, const std::string &port, const std::string &username,

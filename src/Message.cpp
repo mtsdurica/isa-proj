@@ -37,7 +37,6 @@ void Message::ParseFileName(const std::string &serverHostname, const std::string
 
 void Message::ParseMessageBody()
 {
-    std::cerr << "START\n" << this->ResponseString << "\nEND\n";
     // Removing start and end of the fetch response
     std::regex startAndEndRegex("\\*.+(?=\\s)");
     this->MessageBody = std::regex_replace(this->ResponseString, startAndEndRegex, "");
