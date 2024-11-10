@@ -8,10 +8,11 @@ BUILD			:= ./build
 OBJ_DIR			:= $(BUILD)/objects
 INCLUDE_DIR		:= ./include
 TESTS_DIR		:= ./tests
+DOCS_DIR		:= ./docs
 SRC_FILES		:= $(wildcard src/*.cpp)			
 OBJECTS 		:= $(SRC_FILES:%.cpp=$(OBJ_DIR)/%.o)
 
-.PHONY: all test clean build debug
+.PHONY: all test docs clean build debug
 
 all: build ./$(TARGET)
 
@@ -30,7 +31,13 @@ test: all $(TESTS_DIR)/Makefile
 	make -C $(TESTS_DIR)
 	$(TESTS_DIR)/$(TESTS_TARGET)
 
-clean:
+docs: $(DOCS_DIR)/Makefile
+	make -C $(DOCS_DIR)
+
+clean: $(DOCS_DIR)/Makefile $(TESTS_DIR)/Makefile
 	$(RM) $(TARGET)
 	$(RM) $(TESTS_DIR)/tests
 	$(RM) $(OBJ_DIR)
+	make clean -C $(TESTS_DIR)
+	make clean -C $(DOCS_DIR)
+
