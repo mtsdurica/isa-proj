@@ -330,12 +330,12 @@ inline Utils::ReturnCodes CheckArguments(int argc, char **args, Arguments &argum
         authFile.close();
         if (arguments.Username == "")
         {
-            Utils::PrintError(Utils::AUTH_MISSING_CREDENTIALS, "Missing username");
+            Utils::PrintError(Utils::AUTH_MISSING_CREDENTIALS, "Missing username or invalid username format");
             return Utils::AUTH_MISSING_CREDENTIALS;
         }
         if (arguments.Password == "")
         {
-            Utils::PrintError(Utils::AUTH_MISSING_CREDENTIALS, "Missing password");
+            Utils::PrintError(Utils::AUTH_MISSING_CREDENTIALS, "Missing password or invalid password format");
             return Utils::AUTH_MISSING_CREDENTIALS;
         }
     }
