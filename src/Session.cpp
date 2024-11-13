@@ -89,14 +89,13 @@ void Session::ReceiveTaggedResponse()
     this->Buffer = std::string("", BUFFER_SIZE);
 }
 
-void Session::SendMessage(const std::string &message)
+Utils::ReturnCodes Session::SendMessage(const std::string &message)
 {
     std::string messageBuffer = "A" + std::to_string(this->CurrentTagNumber) + " ";
     messageBuffer += message + "\n";
     if (send(this->SocketDescriptor, messageBuffer.c_str(), messageBuffer.length(), 0) == -1)
-    {
-        // TODO: Error handling
-    }
+        return Utils::PrintError(Utils::SOCKET_WRITING, "Failed writing to a socket");
+    return Utils::IMAPCL_SUCCESS;
 }
 
 Utils::ReturnCodes Session::Connect()
@@ -132,7 +131,7 @@ Utils::ReturnCodes Session::Authenticate()
     return Utils::IMAPCL_FAILURE;
 }
 
-Utils::ReturnCodes Session::ValidateMailbox(Utils::TypeOfFetch typeOfFetch)
+Utils::ReturnCodes Session::ValidateMailbox()
 {
     std::regex validityRegex("UIDVALIDITY\\s([0-9]+)");
     std::smatch validityMatch;
@@ -160,15 +159,9 @@ Utils::ReturnCodes Session::ValidateMailbox(Utils::TypeOfFetch typeOfFetch)
                 // and mail will need to be redownloaded
                 for (const auto &entry : std::filesystem::directory_iterator(this->OutDirectoryPath))
                 {
-
                     std::string fileName = entry.path();
-                    std::regex messageUIDRegex;
-                    if (typeOfFetch == Utils::FETCH_ALL)
-                        messageUIDRegex =
-                            std::regex("([0-9]+)_" + this->MailBox + "_" + this->ServerHostname + "_(.+)");
-                    else
-                        messageUIDRegex =
-                            std::regex("([0-9]+)_" + this->MailBox + "_" + this->ServerHostname + "_(.+)_h");
+                    std::regex messageUIDRegex =
+                        std::regex("([0-9]+)_" + this->MailBox + "_" + this->ServerHostname + "_(.+)");
                     std::smatch messageUIDMatch;
                     if (std::regex_search(fileName, messageUIDMatch, messageUIDRegex))
                         std::filesystem::remove_all(entry.path());
@@ -184,7 +177,7 @@ Utils::ReturnCodes Session::ValidateMailbox(Utils::TypeOfFetch typeOfFetch)
     return Utils::IMAPCL_SUCCESS;
 }
 
-Utils::ReturnCodes Session::SelectMailbox(Utils::TypeOfFetch typeOfFetch)
+Utils::ReturnCodes Session::SelectMailbox()
 {
     // Selecting mailbox
     this->SendMessage("SELECT " + this->MailBox);
@@ -193,7 +186,7 @@ Utils::ReturnCodes Session::SelectMailbox(Utils::TypeOfFetch typeOfFetch)
         return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Can not access mailbox");
 
     // Checking UIDValidity of the mailbox
-    if ((this->ReturnCode = this->ValidateMailbox(typeOfFetch)))
+    if ((this->ReturnCode = this->ValidateMailbox()))
         return this->ReturnCode;
 
     this->FullResponse = "";
@@ -201,10 +194,11 @@ Utils::ReturnCodes Session::SelectMailbox(Utils::TypeOfFetch typeOfFetch)
     return Utils::IMAPCL_SUCCESS;
 }
 
-std::vector<std::string> Session::SearchMailbox(const std::string &searchKey)
+std::tuple<std::vector<std::string>, Utils::ReturnCodes> Session::SearchMailbox(const std::string &searchKey)
 {
     // Searching for all mail in selected mailbox
-    this->SendMessage("UID SEARCH " + searchKey);
+    if ((this->ReturnCode = this->SendMessage("UID SEARCH " + searchKey)))
+        return {{}, this->ReturnCode};
     this->ReceiveTaggedResponse();
     Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK");
     std::regex regex("\\b[0-9]+");
@@ -220,7 +214,7 @@ std::vector<std::string> Session::SearchMailbox(const std::string &searchKey)
     this->FullResponse = "";
     this->CurrentTagNumber++;
 
-    return messageUIDs;
+    return {messageUIDs, Utils::IMAPCL_SUCCESS};
 }
 
 std::vector<std::string> Session::SearchLocalMailDirectoryForFullMail()
@@ -262,13 +256,15 @@ std::vector<std::string> Session::SearchLocalMailDirectoryForAll()
 
 Utils::ReturnCodes Session::FetchMail(const bool newMailOnly)
 {
-    if ((this->ReturnCode = this->SelectMailbox(Utils::FETCH_ALL)))
+    if ((this->ReturnCode = this->SelectMailbox()))
         return this->ReturnCode;
     std::vector<std::string> messageUIDs;
     if (newMailOnly)
-        messageUIDs = this->SearchMailbox("UNSEEN");
+        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("UNSEEN");
     else
-        messageUIDs = this->SearchMailbox("ALL");
+        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("ALL");
+    if (this->ReturnCode)
+        return this->ReturnCode;
     std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectoryForFullMail();
     // Retrieving sizes of mail
     // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
@@ -308,13 +304,15 @@ Utils::ReturnCodes Session::FetchMail(const bool newMailOnly)
 
 Utils::ReturnCodes Session::FetchHeaders(const bool newMailOnly)
 {
-    if ((this->ReturnCode = this->SelectMailbox(Utils::FETCH_HEADERS)))
+    if ((this->ReturnCode = this->SelectMailbox()))
         return this->ReturnCode;
     std::vector<std::string> messageUIDs;
     if (newMailOnly)
-        messageUIDs = this->SearchMailbox("UNSEEN");
+        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("UNSEEN");
     else
-        messageUIDs = this->SearchMailbox("ALL");
+        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("ALL");
+    if (this->ReturnCode)
+        return this->ReturnCode;
     std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectoryForAll();
     // Retrieving sizes of mail
     // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
@@ -343,7 +341,8 @@ Utils::ReturnCodes Session::FetchHeaders(const bool newMailOnly)
 }
 Utils::ReturnCodes Session::Logout()
 {
-    this->SendMessage("LOGOUT");
+    if ((this->ReturnCode = this->SendMessage("LOGOUT")))
+        return this->ReturnCode;
     this->ReceiveTaggedResponse();
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
         return Utils::PrintError(Utils::INVALID_RESPONSE, "Response is invalid");

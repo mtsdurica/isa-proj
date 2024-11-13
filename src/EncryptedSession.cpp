@@ -133,7 +133,7 @@ Utils::ReturnCodes EncryptedSession::Authenticate()
     return Utils::IMAPCL_SUCCESS;
 }
 
-Utils::ReturnCodes EncryptedSession::SelectMailbox(Utils::TypeOfFetch typeOfFetch)
+Utils::ReturnCodes EncryptedSession::SelectMailbox()
 {
     // Selecting mailbox
     if ((this->ReturnCode = this->SendMessage("SELECT " + this->MailBox)))
@@ -143,7 +143,7 @@ Utils::ReturnCodes EncryptedSession::SelectMailbox(Utils::TypeOfFetch typeOfFetc
         return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Cant access mailbox");
 
     // Checking UIDValidity of the mailbox
-    if ((this->ReturnCode = this->ValidateMailbox(typeOfFetch)))
+    if ((this->ReturnCode = this->ValidateMailbox()))
         return ReturnCode;
 
     this->FullResponse = "";
@@ -151,10 +151,11 @@ Utils::ReturnCodes EncryptedSession::SelectMailbox(Utils::TypeOfFetch typeOfFetc
     return Utils::IMAPCL_SUCCESS;
 }
 
-std::vector<std::string> EncryptedSession::SearchMailbox(const std::string &searchKey)
+std::tuple<std::vector<std::string>, Utils::ReturnCodes> EncryptedSession::SearchMailbox(const std::string &searchKey)
 {
     // Searching for all mail in selected mailbox
-    this->SendMessage("UID SEARCH " + searchKey);
+    if ((this->ReturnCode = this->SendMessage("UID SEARCH " + searchKey)))
+        return {{}, this->ReturnCode};
     this->ReceiveTaggedResponse();
     Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK");
     // Extracting line with UIDs of mail
@@ -173,18 +174,20 @@ std::vector<std::string> EncryptedSession::SearchMailbox(const std::string &sear
     this->FullResponse = "";
     this->CurrentTagNumber++;
 
-    return messageUIDs;
+    return {messageUIDs, Utils::IMAPCL_SUCCESS};
 }
 
 Utils::ReturnCodes EncryptedSession::FetchMail(const bool newMailOnly)
 {
-    if ((this->ReturnCode = this->SelectMailbox(Utils::FETCH_ALL)))
+    if ((this->ReturnCode = this->SelectMailbox()))
         return this->ReturnCode;
     std::vector<std::string> messageUIDs;
     if (newMailOnly)
-        messageUIDs = this->SearchMailbox("UNSEEN");
+        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("UNSEEN");
     else
-        messageUIDs = this->SearchMailbox("ALL");
+        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("ALL");
+    if (this->ReturnCode)
+        return this->ReturnCode;
     std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectoryForFullMail();
     int numOfDownloaded = 0;
     for (auto x : messageUIDs)
@@ -196,7 +199,8 @@ Utils::ReturnCodes EncryptedSession::FetchMail(const bool newMailOnly)
         if (mailNotToBeDownloaded)
             continue;
         // Retrieving size of each message
-        this->SendMessage("UID FETCH " + x + " RFC822.SIZE");
+        if ((this->ReturnCode = this->SendMessage("UID FETCH " + x + " RFC822.SIZE")))
+            return this->ReturnCode;
         this->ReceiveTaggedResponse();
         Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK");
         std::regex rfcSizeRegex("RFC822.SIZE\\s([0-9]+)");
@@ -206,7 +210,8 @@ Utils::ReturnCodes EncryptedSession::FetchMail(const bool newMailOnly)
         this->FullResponse = "";
         this->CurrentTagNumber++;
         // Fetching mail
-        this->SendMessage("UID FETCH " + x + " BODY[]");
+        if ((this->ReturnCode = this->SendMessage("UID FETCH " + x + " BODY[]")))
+            return this->ReturnCode;
         this->ReceiveTaggedResponse();
         Message message(x, this->FullResponse, stoi(rfcSize));
         message.ParseFileName(this->ServerHostname, this->MailBox);
@@ -222,13 +227,15 @@ Utils::ReturnCodes EncryptedSession::FetchMail(const bool newMailOnly)
 
 Utils::ReturnCodes EncryptedSession::FetchHeaders(const bool newMailOnly)
 {
-    if ((this->ReturnCode = this->SelectMailbox(Utils::FETCH_HEADERS)))
+    if ((this->ReturnCode = this->SelectMailbox()))
         return this->ReturnCode;
     std::vector<std::string> messageUIDs;
     if (newMailOnly)
-        messageUIDs = this->SearchMailbox("UNSEEN");
+        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("UNSEEN");
     else
-        messageUIDs = this->SearchMailbox("ALL");
+        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("ALL");
+    if (this->ReturnCode)
+        return this->ReturnCode;
     std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectoryForAll();
     // Retrieving sizes of mail
     // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
@@ -242,7 +249,8 @@ Utils::ReturnCodes EncryptedSession::FetchHeaders(const bool newMailOnly)
         if (mailNotToBeDownloaded)
             continue;
         // Fetching mail
-        this->SendMessage("UID FETCH " + x + " BODY.PEEK[HEADER]");
+        if ((this->ReturnCode = this->SendMessage("UID FETCH " + x + " BODY.PEEK[HEADER]")))
+            return this->ReturnCode;
         this->ReceiveTaggedResponse();
         HeaderMessage message(x, this->FullResponse);
         message.ParseFileName(this->ServerHostname, this->MailBox);
@@ -258,7 +266,8 @@ Utils::ReturnCodes EncryptedSession::FetchHeaders(const bool newMailOnly)
 
 Utils::ReturnCodes EncryptedSession::Logout()
 {
-    this->SendMessage("LOGOUT");
+    if ((this->ReturnCode = this->SendMessage("LOGOUT")))
+        return this->ReturnCode;
     this->ReceiveTaggedResponse();
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
         return Utils::PrintError(Utils::INVALID_RESPONSE, "Response is invalid");

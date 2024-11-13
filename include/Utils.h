@@ -28,37 +28,30 @@ namespace Utils
 
 typedef enum ReturnCodes
 {
-    IMAPCL_SUCCESS = 0,
-    IMAPCL_FAILURE,
-    ARGS_MISSING_SERVER,
-    ARGS_MISSING_REQUIRED,
-    ARGS_MISSING_OPTION,
-    ARGS_UNKNOWN_ARGUMENT,
-    SOCKET_CREATING,
-    SOCKET_CONNECTING,
-    SERVER_BAD_HOST,
-    AUTH_FILE_OPEN,
-    AUTH_FILE_NONEXISTENT,
-    AUTH_INVALID_CREDENTIALS,
-    AUTH_MISSING_CREDENTIALS,
-    OUT_DIR_NONEXISTENT,
-    VALIDITY_FILE_OPEN,
-    CANT_ACCESS_MAILBOX,
-    SOCKET_WRITING,
-    INVALID_RESPONSE,
-    CERTIFICATE_ERROR,
-    SSL_CONTEXT_CREATE,
-    SSL_CONNECTION_CREATE,
-    SSL_SET_DESCRIPTOR,
-    SSL_HANDSHAKE_FAILED
+    IMAPCL_SUCCESS = 0,       // General success
+    IMAPCL_FAILURE,           // General failure
+    ARGS_MISSING_SERVER,      // Missing server in arguments
+    ARGS_MISSING_REQUIRED,    // Missing required arguments
+    ARGS_MISSING_OPTION,      // Missing option for a argument that requires one
+    ARGS_UNKNOWN_ARGUMENT,    // Unknown argument
+    SOCKET_CREATING,          // Failed creating socket
+    SOCKET_CONNECTING,        // Failed connecting to a socket
+    SERVER_BAD_HOST,          // Bad host
+    AUTH_FILE_OPEN,           // Failed opening authentication file
+    AUTH_FILE_NONEXISTENT,    // Authentication file is not existing
+    AUTH_INVALID_CREDENTIALS, // Invalid credentials
+    AUTH_MISSING_CREDENTIALS, // Missing credentials in authentication file
+    OUT_DIR_NONEXISTENT,      // Output directory not existing
+    VALIDITY_FILE_OPEN,       // Failed opening UID Validity file
+    CANT_ACCESS_MAILBOX,      // Cant access remote mailbox
+    SOCKET_WRITING,           // Failed writing to a socket
+    INVALID_RESPONSE,         // Invalid response received from the server
+    CERTIFICATE_ERROR,        // Certificate error
+    SSL_CONTEXT_CREATE,       // Failed creating SSL context
+    SSL_CONNECTION_CREATE,    // Failed creating SSL connection
+    SSL_SET_DESCRIPTOR,       // Failed setting socket descriptor to the SSL context
+    SSL_HANDSHAKE_FAILED      // Failed the SSL handshake
 } ReturnCodes;
-
-typedef enum TypeOfFetch
-{
-    FETCH_ALL,
-    FETCH_HEADERS,
-    FETCH_NEW
-} TypeOfFetch;
 
 typedef struct Arguments
 {
@@ -265,7 +258,6 @@ inline Utils::ReturnCodes CheckArguments(int argc, char **args, Arguments &argum
         }
     }
 
-    // TODO: parsing of server address
     for (int i = optind; i < argc; i++)
     {
         arguments.ServerAddress = args[i];
