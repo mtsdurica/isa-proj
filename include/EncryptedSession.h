@@ -1,3 +1,13 @@
+/**
+ * @file EncryptedSession.h
+ * @author  Matúš Ďurica (xduric06@stud.fit.vutbr.cz)
+ * @brief Contains declaration of EncryptedSession class
+ * @version 0.1
+ * @date 2024-10-08
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include "Session.h"
@@ -59,10 +69,12 @@ class EncryptedSession final : public Session
     ~EncryptedSession();
     /**
      * @brief Receive untagged response from a server
+     *
      */
     void ReceiveUntaggedResponse();
     /**
      * @brief Receive tagged response from a server
+     *
      */
     void ReceiveTaggedResponse();
     /**

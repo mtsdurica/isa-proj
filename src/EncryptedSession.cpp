@@ -1,3 +1,13 @@
+/**
+ * @file EncryptedSession.cpp
+ * @author  Matúš Ďurica (xduric06@stud.fit.vutbr.cz)
+ * @brief Contains definitions of EncryptedSession class methods
+ * @version 0.1
+ * @date 2024-10-08
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #include "../include/EncryptedSession.h"
 
 #include <openssl/evp.h>
@@ -48,7 +58,12 @@ void EncryptedSession::ReceiveTaggedResponse()
         {
             this->FullResponse += this->Buffer.substr(0, received);
             // Keep listening on the port until 'current tag' is present
-            if (!Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
+            // Weird bug happened, when fetching from imap.stud.fit.vutbr.cz, sometimes this function ignored parts of
+            // the response string passed to it; it was not happening consistently, probably has to do something with
+            // regex, but this workaround worked in my testing
+            if (!Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK") ||
+                !Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sNO") ||
+                !Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sBAD"))
                 break;
         }
     }
@@ -140,7 +155,7 @@ Utils::ReturnCodes EncryptedSession::SelectMailbox()
         return this->ReturnCode;
     this->ReceiveTaggedResponse();
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
-        return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Cant access mailbox");
+        return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Can't access mailbox");
 
     // Checking UIDValidity of the mailbox
     if ((this->ReturnCode = this->ValidateMailbox()))

@@ -82,7 +82,12 @@ void Session::ReceiveTaggedResponse()
         {
             this->FullResponse += this->Buffer.substr(0, received);
             // Keep listening on the port until 'current tag' is present
-            if (!Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
+            // Weird bug happened, when fetching from imap.stud.fit.vutbr.cz, sometimes this function ignored parts of
+            // the response string passed to it; it was not happening consistently, probably has to do something with
+            // regex, but this workaround worked in my testing
+            if (!Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK") ||
+                !Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sNO") ||
+                !Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sBAD"))
                 break;
         }
     }
@@ -111,7 +116,8 @@ Utils::ReturnCodes Session::Connect()
 
 Utils::ReturnCodes Session::Authenticate()
 {
-    this->SendMessage("LOGIN " + this->Username + " " + this->Password);
+    if ((this->ReturnCode = this->SendMessage("LOGIN " + this->Username + " " + this->Password)))
+        return this->ReturnCode;
     this->ReceiveTaggedResponse();
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sNO"))
     {
@@ -126,9 +132,11 @@ Utils::ReturnCodes Session::Authenticate()
             this->CurrentTagNumber++;
             return Utils::IMAPCL_SUCCESS;
         }
-        return Utils::PrintError(Utils::AUTH_INVALID_CREDENTIALS, "Bad credentials");
     }
-    return Utils::IMAPCL_FAILURE;
+    else
+        return Utils::PrintError(Utils::AUTH_INVALID_CREDENTIALS, "Bad credentials");
+
+    return Utils::IMAPCL_SUCCESS;
 }
 
 Utils::ReturnCodes Session::ValidateMailbox()
@@ -183,7 +191,7 @@ Utils::ReturnCodes Session::SelectMailbox()
     this->SendMessage("SELECT " + this->MailBox);
     this->ReceiveTaggedResponse();
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
-        return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Can not access mailbox");
+        return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Can't access mailbox");
 
     // Checking UIDValidity of the mailbox
     if ((this->ReturnCode = this->ValidateMailbox()))

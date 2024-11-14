@@ -1,3 +1,13 @@
+/**
+ * @file Message.h
+ * @author  Matúš Ďurica (xduric06@stud.fit.vutbr.cz)
+ * @brief Contains declaration of Message class
+ * @version 0.1
+ * @date 2024-10-08
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 #include <string>
 
@@ -13,7 +23,22 @@ class Message
   public:
     Message(const std::string &messageUID, const std::string &responseString, int rfcSize);
     ~Message();
+    /**
+     * @brief Parse the filename from the message body
+     *
+     * @param serverHostname Remote server hostname
+     * @param mailbox Remote mailbox from which the mail was fetched
+     */
     void ParseFileName(const std::string &serverHostname, const std::string &mailbox);
+    /**
+     * @brief Parse message body to comply with RFC5322
+     *
+     */
     void ParseMessageBody();
+    /**
+     * @brief Dump message body to a local file
+     *
+     * @param outDirectoryPath Path to the output directory
+     */
     void DumpToFile(const std::string &outDirectoryPath);
 };

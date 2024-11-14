@@ -1,3 +1,13 @@
+/**
+ * @file Message.cpp
+ * @author  Matúš Ďurica (xduric06@stud.fit.vutbr.cz)
+ * @brief Contains definitions of Message class methods
+ * @version 0.1
+ * @date 2024-10-08
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #include "../include/Message.h"
 
 #include <fstream>

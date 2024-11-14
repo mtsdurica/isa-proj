@@ -100,10 +100,12 @@ class Session
     Utils::ReturnCodes SendMessage(const std::string &message);
     /**
      * @brief Receive untagged response from a server
+     *
      */
     void ReceiveUntaggedResponse();
     /**
      * @brief Receive tagged response from a server
+     *
      */
     void ReceiveTaggedResponse();
     /**
