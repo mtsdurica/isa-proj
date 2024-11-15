@@ -15,70 +15,31 @@
 
 int main(int argc, char **argv)
 {
-    /**
-     * TODO:
-     *
-     * -n rewrite to \NEW
-     * comments
-     *
-     * Error handling
-     */
     Utils::Arguments arguments;
-    Utils::ReturnCodes returnCode = Utils::CheckArguments(argc, argv, arguments);
-    if (returnCode)
+    Utils::ReturnCodes returnCode;
+    if ((returnCode = Utils::CheckArguments(argc, argv, arguments)))
         return returnCode;
+    std::unique_ptr<Session> session;
     if (arguments.Encrypted)
-    {
-        EncryptedSession session(arguments.ServerAddress, arguments.Port, arguments.Username, arguments.Password,
-                                 arguments.OutDirectoryPath, arguments.MailBox, arguments.CertificateFile,
-                                 arguments.CertificateFileDirectoryPath);
-        if (session.GetHostAddressInfo())
-            return Utils::SERVER_BAD_HOST;
-        if (session.CreateSocket())
-            return Utils::SOCKET_CREATING;
-        returnCode = session.Connect();
-        if (returnCode)
-            return returnCode;
-        if (session.Authenticate())
-            return Utils::AUTH_FILE_OPEN;
-        if (arguments.OnlyMailHeaders)
-        {
-            if (session.FetchHeaders(arguments.OnlyNewMails))
-                return 1;
-        }
-        else
-        {
-            if (session.FetchMail(arguments.OnlyNewMails))
-                return 1;
-        }
-        if (session.Logout())
-            return Utils::INVALID_RESPONSE;
-    }
+        session = std::make_unique<EncryptedSession>(arguments.ServerAddress, arguments.Port, arguments.Username,
+                                                     arguments.Password, arguments.OutDirectoryPath, arguments.MailBox,
+                                                     arguments.CertificateFile, arguments.CertificateFileDirectoryPath);
     else
-    {
-        Session session(arguments.ServerAddress, arguments.Port, arguments.Username, arguments.Password,
-                        arguments.OutDirectoryPath, arguments.MailBox);
+        session = std::make_unique<Session>(arguments.ServerAddress, arguments.Port, arguments.Username,
+                                            arguments.Password, arguments.OutDirectoryPath, arguments.MailBox);
 
-        if (session.GetHostAddressInfo())
-            return Utils::SERVER_BAD_HOST;
-        if (session.CreateSocket())
-            return Utils::SOCKET_CREATING;
-        if (session.Connect())
-            return Utils::SOCKET_CONNECTING;
-        if (session.Authenticate())
-            return Utils::AUTH_FILE_OPEN;
-        if (arguments.OnlyMailHeaders)
-        {
-            if (session.FetchHeaders(arguments.OnlyNewMails))
-                return 1;
-        }
-        else
-        {
-            if (session.FetchMail(arguments.OnlyNewMails))
-                return 1;
-        }
-        if (session.Logout())
-            return Utils::INVALID_RESPONSE;
-    }
+    if ((returnCode = session->GetHostAddressInfo()))
+        return returnCode;
+    if ((returnCode = session->CreateSocket()))
+        return returnCode;
+    if ((returnCode = session->Connect()))
+        return returnCode;
+    if ((returnCode = session->Authenticate()))
+        return returnCode;
+    if ((returnCode = session->FetchMail(arguments.OnlyMailHeaders, arguments.OnlyNewMails)))
+        return returnCode;
+    if ((returnCode = session->Logout()))
+        return returnCode;
+
     return Utils::IMAPCL_SUCCESS;
 }

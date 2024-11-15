@@ -53,13 +53,4 @@ void HeaderMessage::ParseMessageBody()
     std::regex firstLineRemoveRegex("\\*.+(?=\\s)");
     this->MessageBody = std::regex_replace(this->ResponseString, firstLineRemoveRegex, "");
     this->MessageBody = this->MessageBody.substr(2, headerSize);
-    // Removing remaining part of fetch response (FLAGS)
-    // TODO: rename this var
-    /*std::regex removeFlagsRegex("\n([\\s\\S]+)(?=\n)");*/
-    /*std::regex_search(this->MessageBody, match, removeFlagsRegex);*/
-    /*this->MessageBody = match[1];*/
-    // TODO: Maybe remove this???
-    /*std::regex removeTrailingNewlineRegex("[\\s\\S]+(?=\n)");*/
-    /*std::regex_search(this->MessageBody, match, removeTrailingNewlineRegex);*/
-    /*this->MessageBody = match[0];*/
 }

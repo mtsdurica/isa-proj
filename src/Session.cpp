@@ -19,6 +19,10 @@
 #include "../include/Message.h"
 #include "../include/Session.h"
 
+Session::Session()
+{
+}
+
 Session::Session(const std::string &serverHostname, const std::string &port, const std::string &username,
                  const std::string &password, const std::string &outDirectoryPath, const std::string &mailBox)
     : SocketDescriptor(-1), Server(nullptr), ServerHostname(serverHostname), Port(port), Username(username),
@@ -65,8 +69,10 @@ void Session::ReceiveUntaggedResponse()
         if (received != 0)
         {
             this->FullResponse += this->Buffer.substr(0, received);
-            // TODO: Rework this
-            if (!Utils::ValidateResponse(this->FullResponse, "\\*"))
+            // Keep listening on the port until '*' + OK/NO/BAD is present, so we can stop reading
+            if (!Utils::ValidateResponse(this->FullResponse, "\\*\\sOK") ||
+                !Utils::ValidateResponse(this->FullResponse, "\\*\\sNO") ||
+                !Utils::ValidateResponse(this->FullResponse, "\\*\\sBAD"))
                 break;
         }
     }
@@ -81,10 +87,7 @@ void Session::ReceiveTaggedResponse()
         if (received != 0)
         {
             this->FullResponse += this->Buffer.substr(0, received);
-            // Keep listening on the port until 'current tag' is present
-            // Weird bug happened, when fetching from imap.stud.fit.vutbr.cz, sometimes this function ignored parts of
-            // the response string passed to it; it was not happening consistently, probably has to do something with
-            // regex, but this workaround worked in my testing
+            // Keep listening on the port until 'current tag' + OK/NO/BAD is present, so we can stop reading
             if (!Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK") ||
                 !Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sNO") ||
                 !Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sBAD"))
@@ -123,8 +126,9 @@ Utils::ReturnCodes Session::Authenticate()
     {
         if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
         {
-            Utils::PrintError(Utils::INVALID_RESPONSE, "Response is invalid");
-            return Utils::INVALID_RESPONSE;
+            this->CurrentTagNumber++;
+            this->Logout();
+            return Utils::PrintError(Utils::INVALID_RESPONSE, "Response is invalid");
         }
         else
         {
@@ -134,7 +138,11 @@ Utils::ReturnCodes Session::Authenticate()
         }
     }
     else
+    {
+        this->CurrentTagNumber++;
+        this->Logout();
         return Utils::PrintError(Utils::AUTH_INVALID_CREDENTIALS, "Bad credentials");
+    }
 
     return Utils::IMAPCL_SUCCESS;
 }
@@ -191,11 +199,19 @@ Utils::ReturnCodes Session::SelectMailbox()
     this->SendMessage("SELECT " + this->MailBox);
     this->ReceiveTaggedResponse();
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
-        return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Can't access mailbox");
+    {
+        this->CurrentTagNumber++;
+        this->Logout();
+        return Utils::PrintError(Utils::INVALID_RESPONSE, "Invalid response");
+    }
 
     // Checking UIDValidity of the mailbox
     if ((this->ReturnCode = this->ValidateMailbox()))
+    {
+        this->CurrentTagNumber++;
+        this->Logout();
         return this->ReturnCode;
+    }
 
     this->FullResponse = "";
     this->CurrentTagNumber++;
@@ -204,24 +220,27 @@ Utils::ReturnCodes Session::SelectMailbox()
 
 std::tuple<std::vector<std::string>, Utils::ReturnCodes> Session::SearchMailbox(const std::string &searchKey)
 {
+    std::vector<std::string> messageUIDs;
     // Searching for all mail in selected mailbox
     if ((this->ReturnCode = this->SendMessage("UID SEARCH " + searchKey)))
-        return {{}, this->ReturnCode};
+        return {messageUIDs, this->ReturnCode};
     this->ReceiveTaggedResponse();
-    Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK");
+    if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
+    {
+        this->CurrentTagNumber++;
+        this->Logout();
+        return {messageUIDs, Utils::PrintError(Utils::INVALID_RESPONSE, "Invalid response")};
+    }
     std::regex regex("\\b[0-9]+");
     std::smatch match;
     std::string::const_iterator start(this->FullResponse.cbegin());
-    std::vector<std::string> messageUIDs;
     while (std::regex_search(start, this->FullResponse.cend(), match, regex))
     {
         messageUIDs.push_back(match[0]);
         start = match.suffix().first;
     }
-    // TODO: Handle empty mailbox
     this->FullResponse = "";
     this->CurrentTagNumber++;
-
     return {messageUIDs, Utils::IMAPCL_SUCCESS};
 }
 
@@ -262,20 +281,28 @@ std::vector<std::string> Session::SearchLocalMailDirectoryForAll()
     return localMessagesUIDs;
 }
 
-Utils::ReturnCodes Session::FetchMail(const bool newMailOnly)
+Utils::ReturnCodes Session::FetchMail(const bool headersOnly, const bool newMailOnly)
 {
     if ((this->ReturnCode = this->SelectMailbox()))
         return this->ReturnCode;
     std::vector<std::string> messageUIDs;
     if (newMailOnly)
-        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("UNSEEN");
+        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("NEW");
     else
         std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("ALL");
-    if (this->ReturnCode)
+    if (this->ReturnCode == Utils::SOCKET_WRITING)
         return this->ReturnCode;
-    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectoryForFullMail();
-    // Retrieving sizes of mail
-    // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
+    else if (this->ReturnCode > 0)
+    {
+        this->CurrentTagNumber++;
+        this->Logout();
+        return this->ReturnCode;
+    }
+    std::vector<std::string> localMessagesUIDs;
+    if (headersOnly)
+        localMessagesUIDs = this->SearchLocalMailDirectoryForAll();
+    else
+        localMessagesUIDs = this->SearchLocalMailDirectoryForFullMail();
     unsigned int numOfDownloaded = 0;
     for (auto x : messageUIDs)
     {
@@ -285,68 +312,63 @@ Utils::ReturnCodes Session::FetchMail(const bool newMailOnly)
                 mailNotToBeDownloaded = true;
         if (mailNotToBeDownloaded)
             continue;
-        // Retrieving size of each message
-        this->SendMessage("UID FETCH " + x + " RFC822.SIZE");
-        this->ReceiveTaggedResponse();
-        Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK");
-        std::regex rfcSizeRegex("RFC822.SIZE\\s([0-9]+)");
-        std::smatch rfcSizeMatch;
-        std::regex_search(this->FullResponse, rfcSizeMatch, rfcSizeRegex);
-        std::string rfcSize = rfcSizeMatch[1];
-        this->FullResponse = "";
-        this->CurrentTagNumber++;
-        // Fetching mail
-        this->SendMessage("UID FETCH " + x + " BODY[]");
-        this->ReceiveTaggedResponse();
-        Message message(x, this->FullResponse, stoi(rfcSize));
-        message.ParseFileName(this->ServerHostname, this->MailBox);
-        message.ParseMessageBody();
-        message.DumpToFile(this->OutDirectoryPath);
+        std::unique_ptr<Message> message;
+        if (headersOnly)
+        {
+            // Fetching headers
+            this->SendMessage("UID FETCH " + x + " BODY.PEEK[HEADER]");
+            this->ReceiveTaggedResponse();
+            if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
+            {
+                this->CurrentTagNumber++;
+                this->Logout();
+                return Utils::PrintError(Utils::INVALID_RESPONSE, "Invalid response");
+            }
+            message = std::make_unique<HeaderMessage>(x, this->FullResponse);
+        }
+        else
+        {
+            // Fetching full messages
+            // Retrieving size of each message
+            this->SendMessage("UID FETCH " + x + " RFC822.SIZE");
+            this->ReceiveTaggedResponse();
+            if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
+            {
+                this->CurrentTagNumber++;
+                this->Logout();
+                return Utils::PrintError(Utils::INVALID_RESPONSE, "Invalid response");
+            }
+            std::regex rfcSizeRegex("RFC822.SIZE\\s([0-9]+)");
+            std::smatch rfcSizeMatch;
+            std::regex_search(this->FullResponse, rfcSizeMatch, rfcSizeRegex);
+            std::string rfcSize = rfcSizeMatch[1];
+            this->FullResponse = "";
+            this->CurrentTagNumber++;
+            // Fetching mail
+            this->SendMessage("UID FETCH " + x + " BODY[]");
+            this->ReceiveTaggedResponse();
+            if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
+            {
+                this->CurrentTagNumber++;
+                this->Logout();
+                return Utils::PrintError(Utils::INVALID_RESPONSE, "Invalid response");
+            }
+            message = std::make_unique<Message>(x, this->FullResponse, stoi(rfcSize));
+        }
+        message->ParseFileName(this->ServerHostname, this->MailBox);
+        message->ParseMessageBody();
+        message->DumpToFile(this->OutDirectoryPath);
         this->FullResponse = "";
         this->CurrentTagNumber++;
         numOfDownloaded++;
     }
-    std::cout << "Downloaded: " << numOfDownloaded << " message(s) from " << this->MailBox << "\n";
+    if (headersOnly)
+        std::cout << "Downloaded: " << numOfDownloaded << " header(s) from " << this->MailBox << "\n";
+    else
+        std::cout << "Downloaded: " << numOfDownloaded << " message(s) from " << this->MailBox << "\n";
     return Utils::IMAPCL_SUCCESS;
 }
 
-Utils::ReturnCodes Session::FetchHeaders(const bool newMailOnly)
-{
-    if ((this->ReturnCode = this->SelectMailbox()))
-        return this->ReturnCode;
-    std::vector<std::string> messageUIDs;
-    if (newMailOnly)
-        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("UNSEEN");
-    else
-        std::tie(messageUIDs, this->ReturnCode) = this->SearchMailbox("ALL");
-    if (this->ReturnCode)
-        return this->ReturnCode;
-    std::vector<std::string> localMessagesUIDs = this->SearchLocalMailDirectoryForAll();
-    // Retrieving sizes of mail
-    // TODO: Pass this num to the ReceiveTaggedResponse() to check if send size matches
-    int numOfDownloaded = 0;
-    for (auto x : messageUIDs)
-    {
-        bool mailNotToBeDownloaded = false;
-        for (auto m : localMessagesUIDs)
-            if (!x.compare(m))
-                mailNotToBeDownloaded = true;
-        if (mailNotToBeDownloaded)
-            continue;
-        // Fetching mail
-        this->SendMessage("UID FETCH " + x + " BODY.PEEK[HEADER]");
-        this->ReceiveTaggedResponse();
-        HeaderMessage message(x, this->FullResponse);
-        message.ParseFileName(this->ServerHostname, this->MailBox);
-        message.ParseMessageBody();
-        message.DumpToFile(this->OutDirectoryPath);
-        this->FullResponse = "";
-        this->CurrentTagNumber++;
-        numOfDownloaded++;
-    }
-    std::cout << "Downloaded: " << numOfDownloaded << " header(s) from " << this->MailBox << "\n";
-    return Utils::IMAPCL_SUCCESS;
-}
 Utils::ReturnCodes Session::Logout()
 {
     if ((this->ReturnCode = this->SendMessage("LOGOUT")))

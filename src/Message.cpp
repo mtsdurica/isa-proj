@@ -14,6 +14,10 @@
 #include <iostream>
 #include <regex>
 
+Message::Message()
+{
+}
+
 Message::Message(const std::string &messageUID, const std::string &responseString, int rfcSize)
     : MessageUID(messageUID), ResponseString(responseString), FileName(""), MessageBody(""), RfcSize(rfcSize)
 {

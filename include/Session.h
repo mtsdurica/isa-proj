@@ -43,14 +43,14 @@ class Session
      *
      * @return IMAPCL_SUCCESS if nothing failed, otherwise VALIDITY_FILE_OPEN
      */
-    Utils::ReturnCodes ValidateMailbox();
+    virtual Utils::ReturnCodes ValidateMailbox();
     /**
      * @brief Select mailbox from which to fetch mail.
      *
      * @return IMAPCL_SUCCESS if nothing failed, CANT_ACCESS_MAILBOX if the mailbox can not be accessed,
      * VALIDITY_FILE_OPEN if the UIDValidity file can not be opened
      */
-    Utils::ReturnCodes SelectMailbox();
+    virtual Utils::ReturnCodes SelectMailbox();
     /**
      * @brief Search mailbox for mail UIDs
      *
@@ -58,7 +58,7 @@ class Session
      * @return std::tuple<std::vector<std::string>, Utils::ReturnCodes> Vector containing remote mail UIDs and
      * IMAPCL_SUCCESS if nothing failed, SOCKET_WRITING if sending a request to the server failed
      */
-    std::tuple<std::vector<std::string>, Utils::ReturnCodes> SearchMailbox(const std::string &searchKey);
+    virtual std::tuple<std::vector<std::string>, Utils::ReturnCodes> SearchMailbox(const std::string &searchKey);
     /**
      * @brief Search local mail directory for mail with full messages (headers + message body). If mail with headers
      * only is present, it will be deleted, so full messages can be received. If full messages are found, their
@@ -66,31 +66,32 @@ class Session
      *
      * @return std::vector<std::string> Contains found UIDs of full messages, so they can be omitted during fetching
      */
-    std::vector<std::string> SearchLocalMailDirectoryForFullMail();
+    virtual std::vector<std::string> SearchLocalMailDirectoryForFullMail();
     /**
      * @brief Search local mail directory for all mail (headers only + full messages). If any messages are found,
      * their UIDs will be stored, so they can be omitted during fetching of the remote mail
      *
      * @return std::vector<std::string> Contains found UIDs of messages, so they can be omitted during fetching
      */
-    std::vector<std::string> SearchLocalMailDirectoryForAll();
+    virtual std::vector<std::string> SearchLocalMailDirectoryForAll();
 
   public:
+    Session();
     Session(const std::string &serverHostname, const std::string &port, const std::string &username,
             const std::string &password, const std::string &outDirectoryPath, const std::string &mailBox);
-    ~Session();
+    virtual ~Session();
     /**
      * @brief Get address info about host
      *
      * @return IMAPCL_SUCCESS if nothing failed, otherwise SERVER_BAD_HOST
      */
-    Utils::ReturnCodes GetHostAddressInfo();
+    virtual Utils::ReturnCodes GetHostAddressInfo();
     /**
      * @brief Create communication socket
      *
      * @return IMAPCL_SUCCESS if nothing failed, otherwise SOCKET_CREATING
      */
-    Utils::ReturnCodes CreateSocket();
+    virtual Utils::ReturnCodes CreateSocket();
     /**
      * @brief Send message to a server
      *
@@ -102,43 +103,37 @@ class Session
      * @brief Receive untagged response from a server
      *
      */
-    void ReceiveUntaggedResponse();
+    virtual void ReceiveUntaggedResponse();
     /**
      * @brief Receive tagged response from a server
      *
      */
-    void ReceiveTaggedResponse();
+    virtual void ReceiveTaggedResponse();
     /**
      * @brief Connect to socket
      *
      * @return IMAPCL_SUCCESS if nothing failed, otherwise SOCKET_CONNECTING
      */
-    Utils::ReturnCodes Connect();
+    virtual Utils::ReturnCodes Connect();
     /**
      * @brief Authenticate user on the server
      *
      * @return IMAPCL_SUCCESS if nothing failed
      */
-    Utils::ReturnCodes Authenticate();
+    virtual Utils::ReturnCodes Authenticate();
     /**
      * @brief Fetch full mail from the remote mailbox.
      *
+     * @param headersOnly Fetch only headers
      * @param newMailOnly Fetch only new mail
      * @return IMAPCL_SUCCESS if nothing failed, CANT_ACCESS_MAILBOX if the mailbox can not be accessed,
      * VALIDITY_FILE_OPEN if the UIDValidity file can not be opened
      */
-    Utils::ReturnCodes FetchMail(const bool newMailOnly);
-    /**
-     * @brief Fetch only headers from the mailbox
-     *
-     * @param newMailOnly Fetch only new mail
-     * @return Utils::ReturnCodes
-     */
-    Utils::ReturnCodes FetchHeaders(const bool newMailOnly);
+    virtual Utils::ReturnCodes FetchMail(const bool headersOnly, const bool newMailOnly);
     /**
      * @brief Logout user from session
      *
      * @return IMAPCL_SUCCESS if nothing failed
      */
-    Utils::ReturnCodes Logout();
+    virtual Utils::ReturnCodes Logout();
 };

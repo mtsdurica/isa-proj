@@ -21,24 +21,25 @@ class Message
     int RfcSize;
 
   public:
+    Message();
     Message(const std::string &messageUID, const std::string &responseString, int rfcSize);
-    ~Message();
+    virtual ~Message();
     /**
      * @brief Parse the filename from the message body
      *
      * @param serverHostname Remote server hostname
      * @param mailbox Remote mailbox from which the mail was fetched
      */
-    void ParseFileName(const std::string &serverHostname, const std::string &mailbox);
+    virtual void ParseFileName(const std::string &serverHostname, const std::string &mailbox);
     /**
      * @brief Parse message body to comply with RFC5322
      *
      */
-    void ParseMessageBody();
+    virtual void ParseMessageBody();
     /**
      * @brief Dump message body to a local file
      *
      * @param outDirectoryPath Path to the output directory
      */
-    void DumpToFile(const std::string &outDirectoryPath);
+    virtual void DumpToFile(const std::string &outDirectoryPath);
 };

@@ -90,21 +90,14 @@ class EncryptedSession final : public Session
      */
     Utils::ReturnCodes Authenticate();
     /**
-     * @brief Fetch all mail from a mailbox.
+     * @brief Fetch mail from a mailbox.
      *
+     * @param headersOnly Fetch only headers
      * @param newMailOnly Fetch only new mail
      * @return IMAPCL_SUCCESS if nothing failed, CANT_ACCESS_MAILBOX if the mailbox can not be accessed,
      * VALIDITY_FILE_OPEN if the UIDValidity file can not be opened
      */
-    Utils::ReturnCodes FetchMail(const bool newMailOnly);
-    /**
-     * @brief Fetch only headers from a mailbox.
-     *
-     * @param newMailOnly Fetch only new mail
-     * @return IMAPCL_SUCCESS if nothing failed, CANT_ACCESS_MAILBOX if the mailbox can not be accessed,
-     * VALIDITY_FILE_OPEN if the UIDValidity file can not be opened
-     */
-    Utils::ReturnCodes FetchHeaders(const bool newMailOnly);
+    Utils::ReturnCodes FetchMail(const bool headersOnly, const bool newMailOnly);
     /**
      * @brief Logout user from session
      *
