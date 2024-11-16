@@ -86,7 +86,7 @@ TEST(Arguments, UnknownArgument)
     ASSERT_EQ(Utils::ARGS_UNKNOWN_ARGUMENT, Utils::CheckArguments(numOfArguments, args, arguments));
 }
 
-TEST(Arguments, MissingOptionA)
+TEST(ArgumentsMissingOptions, MissingOptionAuthFile)
 {
     int numOfArguments = 5;
     char *args[] = {(char *)"./imapcl",
@@ -101,7 +101,85 @@ TEST(Arguments, MissingOptionA)
     ASSERT_EQ(Utils::ARGS_MISSING_OPTION, Utils::CheckArguments(numOfArguments, args, arguments));
 }
 
-TEST(Arguments, MissingOptionB)
+TEST(ArgumentsMissingOptions, MissingOptionInbox)
+{
+    int numOfArguments = 7;
+    char *args[] = {
+        (char *)"./imapcl", (char *)"example.server", (char *)"-b", (char *)"-a", (char *)"./tests/resources/example/",
+        (char *)"-o",       (char *)"/dev/null",      nullptr};
+    // Reset optind before each test run
+    optind = 1;
+    Utils::Arguments arguments;
+    ASSERT_EQ(Utils::ARGS_MISSING_OPTION, Utils::CheckArguments(numOfArguments, args, arguments));
+}
+
+TEST(ArgumentsMissingOptions, MissingOptionCertFile)
+{
+    int numOfArguments = 7;
+    char *args[] = {
+        (char *)"./imapcl", (char *)"example.server", (char *)"-c", (char *)"-a", (char *)"./tests/resources/example/",
+        (char *)"-o",       (char *)"/dev/null",      nullptr};
+    // Reset optind before each test run
+    optind = 1;
+    Utils::Arguments arguments;
+    ASSERT_EQ(Utils::ARGS_MISSING_OPTION, Utils::CheckArguments(numOfArguments, args, arguments));
+}
+
+TEST(ArgumentsMissingOptions, MissingOptionCertDir)
+{
+    int numOfArguments = 7;
+    char *args[] = {
+        (char *)"./imapcl", (char *)"example.server", (char *)"-C", (char *)"-a", (char *)"./tests/resources/example/",
+        (char *)"-o",       (char *)"/dev/null",      nullptr};
+    // Reset optind before each test run
+    optind = 1;
+    Utils::Arguments arguments;
+    ASSERT_EQ(Utils::ARGS_MISSING_OPTION, Utils::CheckArguments(numOfArguments, args, arguments));
+}
+
+TEST(ArgumentsMissingOptions, MissingOptionOutDir)
+{
+    int numOfArguments = 5;
+    char *args[] = {(char *)"./imapcl",
+                    (char *)"example.server",
+                    (char *)"-o",
+                    (char *)"-a",
+                    (char *)"./tests/resources/example/",
+                    nullptr};
+    // Reset optind before each test run
+    optind = 1;
+    Utils::Arguments arguments;
+    ASSERT_EQ(Utils::ARGS_MISSING_OPTION, Utils::CheckArguments(numOfArguments, args, arguments));
+}
+
+TEST(ArgumentsMissingOptions, MissingOptionPort)
+{
+    int numOfArguments = 5;
+    char *args[] = {(char *)"./imapcl",
+                    (char *)"example.server",
+                    (char *)"-p",
+                    (char *)"-a",
+                    (char *)"./tests/resources/example/",
+                    nullptr};
+    // Reset optind before each test run
+    optind = 1;
+    Utils::Arguments arguments;
+    ASSERT_EQ(Utils::ARGS_MISSING_OPTION, Utils::CheckArguments(numOfArguments, args, arguments));
+}
+
+TEST(ArgumentsMissingOptions, MissingOptionAuthFileEnd)
+{
+    int numOfArguments = 5;
+    char *args[] = {(char *)"./imapcl", (char *)"example.server",
+                    (char *)"-o",       (char *)"./tests/resources/example/",
+                    (char *)"-a",       nullptr};
+    // Reset optind before each test run
+    optind = 1;
+    Utils::Arguments arguments;
+    ASSERT_EQ(Utils::ARGS_MISSING_OPTION, Utils::CheckArguments(numOfArguments, args, arguments));
+}
+
+TEST(ArgumentsMissingOptions, MissingOptionInboxEnd)
 {
     int numOfArguments = 7;
     char *args[] = {(char *)"./imapcl", (char *)"example.server", (char *)"-a", (char *)"./tests/resources/example/",
@@ -112,12 +190,46 @@ TEST(Arguments, MissingOptionB)
     ASSERT_EQ(Utils::ARGS_MISSING_OPTION, Utils::CheckArguments(numOfArguments, args, arguments));
 }
 
-TEST(Arguments, MissingOptionO)
+TEST(ArgumentsMissingOptions, MissingOptionCertFileEnd)
+{
+    int numOfArguments = 7;
+    char *args[] = {(char *)"./imapcl", (char *)"example.server", (char *)"-a", (char *)"./tests/resources/example/",
+                    (char *)"-o",       (char *)"/dev/null",      (char *)"-c", nullptr};
+    // Reset optind before each test run
+    optind = 1;
+    Utils::Arguments arguments;
+    ASSERT_EQ(Utils::ARGS_MISSING_OPTION, Utils::CheckArguments(numOfArguments, args, arguments));
+}
+
+TEST(ArgumentsMissingOptions, MissingOptionCertDirEnd)
+{
+    int numOfArguments = 7;
+    char *args[] = {(char *)"./imapcl", (char *)"example.server", (char *)"-a", (char *)"./tests/resources/example/",
+                    (char *)"-o",       (char *)"/dev/null",      (char *)"-C", nullptr};
+    // Reset optind before each test run
+    optind = 1;
+    Utils::Arguments arguments;
+    ASSERT_EQ(Utils::ARGS_MISSING_OPTION, Utils::CheckArguments(numOfArguments, args, arguments));
+}
+
+TEST(ArgumentsMissingOptions, MissingOptionOutDirEnd)
 {
     int numOfArguments = 5;
     char *args[] = {(char *)"./imapcl", (char *)"example.server",
                     (char *)"-a",       (char *)"./tests/resources/example/",
                     (char *)"-o",       nullptr};
+    // Reset optind before each test run
+    optind = 1;
+    Utils::Arguments arguments;
+    ASSERT_EQ(Utils::ARGS_MISSING_OPTION, Utils::CheckArguments(numOfArguments, args, arguments));
+}
+
+TEST(ArgumentsMissingOptions, MissingOptionPortEnd)
+{
+    int numOfArguments = 5;
+    char *args[] = {(char *)"./imapcl", (char *)"example.server",
+                    (char *)"-a",       (char *)"./tests/resources/example/",
+                    (char *)"-p",       nullptr};
     // Reset optind before each test run
     optind = 1;
     Utils::Arguments arguments;

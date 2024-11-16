@@ -34,12 +34,29 @@ int main(int argc, char **argv)
         return returnCode;
     if ((returnCode = session->Connect()))
         return returnCode;
+#ifdef DEBUG
+    std::cerr << "Authenticating...";
+#endif
     if ((returnCode = session->Authenticate()))
         return returnCode;
+#ifdef DEBUG
+    std::cerr << " DONE" << std::endl;
+#endif
+#ifdef DEBUG
+    std::cerr << "Fetching..." << std::endl;
+#endif
     if ((returnCode = session->FetchMail(arguments.OnlyMailHeaders, arguments.OnlyNewMails)))
         return returnCode;
+#ifdef DEBUG
+    std::cerr << "Fetching DONE" << std::endl;
+#endif
+#ifdef DEBUG
+    std::cerr << "Logging out...";
+#endif
     if ((returnCode = session->Logout()))
         return returnCode;
-
+#ifdef DEBUG
+    std::cerr << " DONE" << std::endl;
+#endif
     return Utils::IMAPCL_SUCCESS;
 }

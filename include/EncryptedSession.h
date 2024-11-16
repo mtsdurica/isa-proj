@@ -71,12 +71,12 @@ class EncryptedSession final : public Session
      * @brief Receive untagged response from a server
      *
      */
-    void ReceiveUntaggedResponse();
+    Utils::ReturnCodes ReceiveUntaggedResponse();
     /**
      * @brief Receive tagged response from a server
      *
      */
-    void ReceiveTaggedResponse();
+    Utils::ReturnCodes ReceiveTaggedResponse();
     /**
      * @brief Connect to socket
      *

@@ -32,11 +32,13 @@ EncryptedSession::~EncryptedSession()
     SSL_CTX_free(this->SecureContext);
 }
 
-void EncryptedSession::ReceiveUntaggedResponse()
+Utils::ReturnCodes EncryptedSession::ReceiveUntaggedResponse()
 {
     while (true)
     {
         unsigned long int received = SSL_read(this->SecureConnection, this->Buffer.data(), BUFFER_SIZE);
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return Utils::PrintError(Utils::SOCKET_TIMED_OUT, "Timed out");
         if (received != 0)
         {
             this->FullResponse += this->Buffer.substr(0, received);
@@ -48,13 +50,16 @@ void EncryptedSession::ReceiveUntaggedResponse()
         }
     }
     this->Buffer = std::string("", BUFFER_SIZE);
+    return Utils::IMAPCL_SUCCESS;
 }
 
-void EncryptedSession::ReceiveTaggedResponse()
+Utils::ReturnCodes EncryptedSession::ReceiveTaggedResponse()
 {
     while (true)
     {
         unsigned long int received = SSL_read(this->SecureConnection, this->Buffer.data(), BUFFER_SIZE);
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return Utils::PrintError(Utils::SOCKET_TIMED_OUT, "Timed out");
         if (received != 0)
         {
             this->FullResponse += this->Buffer.substr(0, received);
@@ -66,6 +71,7 @@ void EncryptedSession::ReceiveTaggedResponse()
         }
     }
     this->Buffer = std::string("", BUFFER_SIZE);
+    return Utils::IMAPCL_SUCCESS;
 }
 
 Utils::ReturnCodes EncryptedSession::LoadCertificates()
@@ -77,6 +83,9 @@ Utils::ReturnCodes EncryptedSession::LoadCertificates()
 
 Utils::ReturnCodes EncryptedSession::EncryptSocket()
 {
+#ifdef DEBUG
+    std::cerr << "Encrypting socket... ";
+#endif
     SSL_load_error_strings();
     SSL_library_init();
     OpenSSL_add_all_algorithms();
@@ -99,6 +108,9 @@ Utils::ReturnCodes EncryptedSession::EncryptSocket()
     // Connecting through SSL
     if (SSL_connect(this->SecureConnection) <= 0)
         return Utils::PrintError(Utils::SSL_HANDSHAKE_FAILED, "Failed SSL handshake");
+#ifdef DEBUG
+    std::cerr << "DONE" << std::endl;
+#endif
     return Utils::IMAPCL_SUCCESS;
 }
 
@@ -117,6 +129,10 @@ Utils::ReturnCodes EncryptedSession::Connect()
         return Utils::PrintError(Utils::SOCKET_CONNECTING, "Connecting to socket failed");
     if ((this->ReturnCode = this->EncryptSocket()))
         return this->ReturnCode;
+    if ((this->ReturnCode = this->ReceiveUntaggedResponse()))
+        return this->ReturnCode;
+    if (Utils::ValidateResponse(this->FullResponse, "\\*\\sOK"))
+        return Utils::PrintError(Utils::INVALID_RESPONSE, "Response is invalid");
     this->FullResponse = "";
     return Utils::IMAPCL_SUCCESS;
 }
@@ -125,7 +141,8 @@ Utils::ReturnCodes EncryptedSession::Authenticate()
 {
     if ((this->ReturnCode = this->SendMessage("LOGIN " + this->Username + " " + this->Password)))
         return this->ReturnCode;
-    this->ReceiveTaggedResponse();
+    if ((this->ReturnCode = this->ReceiveTaggedResponse()))
+        return this->ReturnCode;
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sNO"))
     {
         if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
@@ -152,17 +169,26 @@ Utils::ReturnCodes EncryptedSession::Authenticate()
 
 Utils::ReturnCodes EncryptedSession::SelectMailbox()
 {
+#ifdef DEBUG
+    std::cerr << "Selecting mailbox " << this->MailBox << "... ";
+#endif
     // Selecting mailbox
     if ((this->ReturnCode = this->SendMessage("SELECT " + this->MailBox)))
         return this->ReturnCode;
-    this->ReceiveTaggedResponse();
+    if ((this->ReturnCode = this->ReceiveTaggedResponse()))
+        return this->ReturnCode;
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
     {
         this->CurrentTagNumber++;
         this->Logout();
         return Utils::PrintError(Utils::CANT_ACCESS_MAILBOX, "Can't access mailbox");
     }
-
+#ifdef DEBUG
+    std::cerr << "DONE" << std::endl;
+#endif
+#ifdef DEBUG
+    std::cerr << "Checking validity... ";
+#endif
     // Checking UIDValidity of the mailbox
     if ((this->ReturnCode = this->ValidateMailbox()))
     {
@@ -170,7 +196,9 @@ Utils::ReturnCodes EncryptedSession::SelectMailbox()
         this->Logout();
         return this->ReturnCode;
     }
-
+#ifdef DEBUG
+    std::cerr << "DONE" << std::endl;
+#endif
     this->FullResponse = "";
     this->CurrentTagNumber++;
     return Utils::IMAPCL_SUCCESS;
@@ -179,16 +207,23 @@ Utils::ReturnCodes EncryptedSession::SelectMailbox()
 std::tuple<std::vector<std::string>, Utils::ReturnCodes> EncryptedSession::SearchMailbox(const std::string &searchKey)
 {
     std::vector<std::string> messageUIDs;
+#ifdef DEBUG
+    std::cerr << "Searching for " << searchKey << "... ";
+#endif
     // Searching for all mail in selected mailbox
     if ((this->ReturnCode = this->SendMessage("UID SEARCH " + searchKey)))
         return {messageUIDs, this->ReturnCode};
-    this->ReceiveTaggedResponse();
+    if ((this->ReturnCode = this->ReceiveTaggedResponse()))
+        return {messageUIDs, this->ReturnCode};
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
     {
         this->CurrentTagNumber++;
         this->Logout();
         return {messageUIDs, Utils::PrintError(Utils::INVALID_RESPONSE, "Invalid response")};
     }
+#ifdef DEBUG
+    std::cerr << "DONE" << std::endl;
+#endif
     // Extracting line with UIDs of mail
     std::regex removeSecondLine("A" + std::to_string(this->CurrentTagNumber) + "[\\s\\S]+");
     this->FullResponse = std::regex_replace(this->FullResponse, removeSecondLine, "");
@@ -200,9 +235,9 @@ std::tuple<std::vector<std::string>, Utils::ReturnCodes> EncryptedSession::Searc
         messageUIDs.push_back(match[0]);
         start = match.suffix().first;
     }
+
     this->FullResponse = "";
     this->CurrentTagNumber++;
-
     return {messageUIDs, Utils::IMAPCL_SUCCESS};
 }
 
@@ -240,15 +275,23 @@ Utils::ReturnCodes EncryptedSession::FetchMail(const bool headersOnly, const boo
         std::unique_ptr<Message> message;
         if (headersOnly)
         {
+
             // Fetching headers
             this->SendMessage("UID FETCH " + x + " BODY.PEEK[HEADER]");
-            this->ReceiveTaggedResponse();
+#ifdef DEBUG
+            std::cerr << "Fetching headers of message with UID: " << x << " in progress...";
+#endif
+            if ((this->ReturnCode = this->ReceiveTaggedResponse()))
+                return this->ReturnCode;
             if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
             {
                 this->CurrentTagNumber++;
                 this->Logout();
                 return Utils::PrintError(Utils::INVALID_RESPONSE, "Invalid response");
             }
+#ifdef DEBUG
+            std::cerr << " DONE" << std::endl;
+#endif
             message = std::make_unique<HeaderMessage>(x, this->FullResponse);
         }
         else
@@ -256,7 +299,8 @@ Utils::ReturnCodes EncryptedSession::FetchMail(const bool headersOnly, const boo
             // Fetching full messages
             // Retrieving size of each message
             this->SendMessage("UID FETCH " + x + " RFC822.SIZE");
-            this->ReceiveTaggedResponse();
+            if ((this->ReturnCode = this->ReceiveTaggedResponse()))
+                return this->ReturnCode;
             if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
             {
                 this->CurrentTagNumber++;
@@ -271,13 +315,20 @@ Utils::ReturnCodes EncryptedSession::FetchMail(const bool headersOnly, const boo
             this->CurrentTagNumber++;
             // Fetching mail
             this->SendMessage("UID FETCH " + x + " BODY[]");
-            this->ReceiveTaggedResponse();
+#ifdef DEBUG
+            std::cerr << "Fetching full message with UID: " << x << " in progress...";
+#endif
+            if ((this->ReturnCode = this->ReceiveTaggedResponse()))
+                return this->ReturnCode;
             if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
             {
                 this->CurrentTagNumber++;
                 this->Logout();
                 return Utils::PrintError(Utils::INVALID_RESPONSE, "Invalid response");
             }
+#ifdef DEBUG
+            std::cerr << " DONE" << std::endl;
+#endif
             message = std::make_unique<Message>(x, this->FullResponse, stoi(rfcSize));
         }
         message->ParseFileName(this->ServerHostname, this->MailBox);
@@ -288,9 +339,17 @@ Utils::ReturnCodes EncryptedSession::FetchMail(const bool headersOnly, const boo
         numOfDownloaded++;
     }
     if (headersOnly)
-        std::cout << "Downloaded: " << numOfDownloaded << " header(s) from " << this->MailBox << "\n";
+        if (newMailOnly)
+            std::cout << "Downloaded: " << numOfDownloaded << " new header(s) from " << this->MailBox << "\n";
+        else
+            std::cout << "Downloaded: " << numOfDownloaded << " header(s) from " << this->MailBox << "\n";
     else
-        std::cout << "Downloaded: " << numOfDownloaded << " message(s) from " << this->MailBox << "\n";
+    {
+        if (newMailOnly)
+            std::cout << "Downloaded: " << numOfDownloaded << " new message(s) from " << this->MailBox << "\n";
+        else
+            std::cout << "Downloaded: " << numOfDownloaded << " message(s) from " << this->MailBox << "\n";
+    }
     return Utils::IMAPCL_SUCCESS;
 }
 
@@ -298,7 +357,8 @@ Utils::ReturnCodes EncryptedSession::Logout()
 {
     if ((this->ReturnCode = this->SendMessage("LOGOUT")))
         return this->ReturnCode;
-    this->ReceiveTaggedResponse();
+    if ((this->ReturnCode = this->ReceiveTaggedResponse()))
+        return this->ReturnCode;
     if (Utils::ValidateResponse(this->FullResponse, "A" + std::to_string(this->CurrentTagNumber) + "\\sOK"))
         return Utils::PrintError(Utils::INVALID_RESPONSE, "Response is invalid");
     this->FullResponse = "";

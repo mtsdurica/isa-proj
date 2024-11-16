@@ -21,7 +21,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 2048
 
 namespace Utils
 {
@@ -34,9 +34,11 @@ typedef enum ReturnCodes
     ARGS_MISSING_REQUIRED,    // Missing required arguments
     ARGS_MISSING_OPTION,      // Missing option for a argument that requires one
     ARGS_UNKNOWN_ARGUMENT,    // Unknown argument
+    ARGS_NOT_ENRYPTED,        // Missing -T argument when -c/-C/both present
     SOCKET_CREATING,          // Failed creating socket
     SOCKET_CONNECTING,        // Failed connecting to a socket
     SERVER_BAD_HOST,          // Bad host
+    SOCKET_TIMED_OUT,         // Socket timed out
     AUTH_FILE_OPEN,           // Failed opening authentication file
     AUTH_FILE_NONEXISTENT,    // Authentication file is not existing
     AUTH_INVALID_CREDENTIALS, // Invalid credentials
@@ -119,6 +121,7 @@ inline Utils::ReturnCodes CheckArguments(int argc, char **args, Arguments &argum
     bool serverAddressSet = false;
     bool authFileSet = false;
     bool outDirectorySet = false;
+    bool certificateFileSet, certificateDirectorySet = false;
     opterr = 0;
     while ((opt = getopt(argc, args, "a:o:p:c:C:b:Tnh")) != -1)
     {
@@ -146,6 +149,7 @@ inline Utils::ReturnCodes CheckArguments(int argc, char **args, Arguments &argum
             arguments.Encrypted = true;
             break;
         case 'c':
+            certificateFileSet = true;
             if (optarg[0] == '-')
             {
                 switch (optarg[1])
@@ -164,6 +168,7 @@ inline Utils::ReturnCodes CheckArguments(int argc, char **args, Arguments &argum
             arguments.CertificateFile = optarg;
             break;
         case 'C':
+            certificateDirectorySet = true;
             if (optarg[0] == '-')
             {
                 switch (optarg[1])
@@ -244,8 +249,8 @@ inline Utils::ReturnCodes CheckArguments(int argc, char **args, Arguments &argum
             outDirectorySet = true;
             break;
         case '?':
-            // Handling '-a' or '-o' being last argument and without its required option
-            if (optopt == 'a' || optopt == 'o')
+            // Handling '-a', '-o', '-b', '-c', '-C', '-p' being last argument and without its required option
+            if (optopt == 'a' || optopt == 'o' || optopt == 'b' || optopt == 'c' || optopt == 'C' || optopt == 'p')
             {
                 PrintError(Utils::ARGS_MISSING_OPTION, "Missing required argument option");
                 return Utils::ARGS_MISSING_OPTION;
@@ -335,6 +340,9 @@ inline Utils::ReturnCodes CheckArguments(int argc, char **args, Arguments &argum
     if (arguments.Encrypted)
         if (arguments.Port == "143")
             arguments.Port = "993";
+
+    if (!arguments.Encrypted && (certificateFileSet || certificateDirectorySet))
+        return Utils::PrintError(Utils::ARGS_NOT_ENRYPTED, "Tried passing certificates when not encrypted");
 
     return Utils::IMAPCL_SUCCESS;
 }

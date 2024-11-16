@@ -103,12 +103,12 @@ class Session
      * @brief Receive untagged response from a server
      *
      */
-    virtual void ReceiveUntaggedResponse();
+    virtual Utils::ReturnCodes ReceiveUntaggedResponse();
     /**
      * @brief Receive tagged response from a server
      *
      */
-    virtual void ReceiveTaggedResponse();
+    virtual Utils::ReturnCodes ReceiveTaggedResponse();
     /**
      * @brief Connect to socket
      *
