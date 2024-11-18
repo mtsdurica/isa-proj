@@ -101,7 +101,7 @@ inline Utils::ReturnCodes PrintError(ReturnCodes returnCode, const std::string &
  */
 inline bool ValidateResponse(const std::string &response, const std::string &expressionString)
 {
-    std::regex expression(expressionString);
+    std::regex expression(expressionString, std::regex_constants::icase);
     std::smatch match;
     return (!std::regex_search(response, match, expression));
 }
@@ -317,10 +317,10 @@ inline Utils::ReturnCodes CheckArguments(int argc, char **args, Arguments &argum
         while (std::getline(authFile, line))
         {
             std::smatch matched;
-            std::regex usernameRegex("username\\s=\\s(.+)");
+            std::regex usernameRegex("username\\s=\\s(.+)", std::regex_constants::icase);
             if (std::regex_search(line, matched, usernameRegex))
                 arguments.Username = matched[1];
-            std::regex passwordRegex("password\\s=\\s(.+)");
+            std::regex passwordRegex("password\\s=\\s(.+)", std::regex_constants::icase);
             if (std::regex_search(line, matched, passwordRegex))
                 arguments.Password = matched[1];
         }

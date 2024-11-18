@@ -160,7 +160,7 @@ Utils::ReturnCodes Session::Authenticate()
 
 Utils::ReturnCodes Session::ValidateMailbox()
 {
-    std::regex validityRegex("UIDVALIDITY\\s([0-9]+)");
+    std::regex validityRegex("UIDVALIDITY\\s([0-9]+)", std::regex_constants::icase);
     std::smatch validityMatch;
     std::regex_search(this->FullResponse, validityMatch, validityRegex);
     std::string UIDValidity = validityMatch[1];
@@ -188,7 +188,8 @@ Utils::ReturnCodes Session::ValidateMailbox()
                 {
                     std::string fileName = entry.path();
                     std::regex messageUIDRegex =
-                        std::regex("([0-9]+)_" + this->MailBox + "_" + this->ServerHostname + "_(.+)");
+                        std::regex("([0-9]+)_" + this->MailBox + "_" + this->ServerHostname + "_(.+)",
+                                   std::regex_constants::icase);
                     std::smatch messageUIDMatch;
                     if (std::regex_search(fileName, messageUIDMatch, messageUIDRegex))
                         std::filesystem::remove_all(entry.path());
@@ -263,7 +264,7 @@ std::tuple<std::vector<std::string>, Utils::ReturnCodes> Session::SearchMailbox(
     // Extracting line with UIDs of mail
     std::regex removeSecondLine("A" + std::to_string(this->CurrentTagNumber) + "[\\s\\S]+");
     this->FullResponse = std::regex_replace(this->FullResponse, removeSecondLine, "");
-    std::regex regex("[0-9]+");
+    std::regex regex("[0-9]+", std::regex_constants::icase);
     std::smatch match;
     std::string::const_iterator start(this->FullResponse.cbegin());
     while (std::regex_search(start, this->FullResponse.cend(), match, regex))
@@ -283,8 +284,8 @@ std::vector<std::string> Session::SearchLocalMailDirectoryForFullMail()
     for (const auto &entry : std::filesystem::directory_iterator(this->OutDirectoryPath))
     {
         std::string fileName = entry.path();
-        std::regex messageUIDRegex("([0-9]+)(.+)");
-        std::regex messageHeadersRegex("([0-9]+)(.+)(_h)");
+        std::regex messageUIDRegex("([0-9]+)(.+)", std::regex_constants::icase);
+        std::regex messageHeadersRegex("([0-9]+)(.+)(_h)", std::regex_constants::icase);
         std::smatch messageUIDMatch;
         std::smatch messageHeadersMatch;
         if (std::regex_search(fileName, messageUIDMatch, messageUIDRegex))
@@ -306,7 +307,7 @@ std::vector<std::string> Session::SearchLocalMailDirectoryForAll()
     for (const auto &entry : std::filesystem::directory_iterator(this->OutDirectoryPath))
     {
         std::string fileName = entry.path();
-        std::regex messageUIDRegex("([0-9]+)(.+)");
+        std::regex messageUIDRegex("([0-9]+)(.+)", std::regex_constants::icase);
         std::smatch messageUIDMatch;
         if (std::regex_search(fileName, messageUIDMatch, messageUIDRegex))
             localMessagesUIDs.push_back(messageUIDMatch[1]);
@@ -379,7 +380,7 @@ Utils::ReturnCodes Session::FetchMail(const bool headersOnly, const bool newMail
                 this->Logout();
                 return Utils::PrintError(Utils::INVALID_RESPONSE, "Invalid response");
             }
-            std::regex rfcSizeRegex("RFC822.SIZE\\s([0-9]+)");
+            std::regex rfcSizeRegex("RFC822.SIZE\\s([0-9]+)", std::regex_constants::icase);
             std::smatch rfcSizeMatch;
             std::regex_search(this->FullResponse, rfcSizeMatch, rfcSizeRegex);
             std::string rfcSize = rfcSizeMatch[1];

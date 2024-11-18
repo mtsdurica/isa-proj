@@ -225,9 +225,10 @@ std::tuple<std::vector<std::string>, Utils::ReturnCodes> EncryptedSession::Searc
     std::cerr << "DONE" << std::endl;
 #endif
     // Extracting line with UIDs of mail
-    std::regex removeSecondLine("A" + std::to_string(this->CurrentTagNumber) + "[\\s\\S]+");
+    std::regex removeSecondLine("A" + std::to_string(this->CurrentTagNumber) + "[\\s\\S]+",
+                                std::regex_constants::icase);
     this->FullResponse = std::regex_replace(this->FullResponse, removeSecondLine, "");
-    std::regex regex("[0-9]+");
+    std::regex regex("[0-9]+", std::regex_constants::icase);
     std::smatch match;
     std::string::const_iterator start(this->FullResponse.cbegin());
     while (std::regex_search(start, this->FullResponse.cend(), match, regex))
@@ -307,7 +308,7 @@ Utils::ReturnCodes EncryptedSession::FetchMail(const bool headersOnly, const boo
                 this->Logout();
                 return Utils::PrintError(Utils::INVALID_RESPONSE, "Invalid response");
             }
-            std::regex rfcSizeRegex("RFC822.SIZE\\s([0-9]+)");
+            std::regex rfcSizeRegex("RFC822.SIZE\\s([0-9]+)", std::regex_constants::icase);
             std::smatch rfcSizeMatch;
             std::regex_search(this->FullResponse, rfcSizeMatch, rfcSizeRegex);
             std::string rfcSize = rfcSizeMatch[1];
