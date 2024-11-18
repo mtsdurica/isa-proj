@@ -99,6 +99,7 @@ Utils::ReturnCodes EncryptedSession::EncryptSocket()
     // Verifying certificate directory
     if (!SSL_CTX_load_verify_dir(this->SecureContext, this->CertificateFileDirectoryPath.c_str()))
         return Utils::PrintError(Utils::CERTIFICATE_ERROR, "Certificate directory error");
+    SSL_CTX_set_verify(this->SecureContext, SSL_VERIFY_PEER, nullptr);
     // Creating SSL connection from context
     if ((this->SecureConnection = SSL_new(this->SecureContext)) == nullptr)
         return Utils::PrintError(Utils::SSL_CONNECTION_CREATE, "Failed creating SSL connection");
